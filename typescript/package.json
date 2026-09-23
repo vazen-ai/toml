@@ -1,0 +1,61 @@
+{
+  "name": "@vazen-ai/toml",
+  "version": "0.0.0-development.0",
+  "description": "Vazen TOML planogram tooling. Development package: legacy PSA writing only.",
+  "keywords": [
+    "planogram",
+    "retail",
+    "psa",
+    "vazen",
+    "toml"
+  ],
+  "homepage": "https://toml.vazen.com/",
+  "bugs": "https://github.com/vazen-ai/toml/issues",
+  "license": "(Apache-2.0 AND CC-BY-4.0)",
+  "author": "Vazen Technologies Ltd (https://www.vazen.com/)",
+  "repository": {
+    "directory": "typescript",
+    "type": "git",
+    "url": "git+https://github.com/vazen-ai/toml.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "types": "./dist/index.d.mts",
+  "files": [
+    "dist",
+    "LICENSE-APACHE",
+    "LICENSE-CC-BY",
+    "LICENSING.md"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "check": "tsc --noEmit",
+    "lint": "publint && attw --pack --profile esm-only",
+    "prepack": "tsdown && cp ../LICENSE-APACHE ../LICENSE-CC-BY ../LICENSING.md .",
+    "test": "vitest run",
+    "verify": "npm run check && npm test && npm run build && npm run lint"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@types/node": "26.5.1",
+    "effect": "3.22.2",
+    "publint": "0.3.24",
+    "tsdown": "0.23.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
+  },
+  "peerDependencies": {
+    "effect": "^3.22.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

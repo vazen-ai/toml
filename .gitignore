@@ -1,0 +1,5 @@
+**/node_modules/
+**/dist/
+**/*.tgz
+# The package build copies the shared licence files into the package root.
+typescript/LICENS*
