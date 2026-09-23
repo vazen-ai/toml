@@ -1,0 +1,193 @@
+/* eslint-disable perfectionist/sort-objects -- column configuration reads name, then bounds, then default; the wire order is the columns array, which this rule never touches */
+import { DoorDirection, FillPattern } from './enums';
+import {
+  createEnumColumn,
+  createFixedValueColumn,
+  createFlagColumn,
+  createFloatColumn,
+  createIntegerColumn,
+  createStringColumn,
+  toPsaRow,
+  type Column,
+  type PsaDefinition,
+} from './psa-definitions';
+
+const segmentColumns: Array<Column> = [
+  createFixedValueColumn({ name: 'Type', value: 'Segment' }),
+  createStringColumn({ name: 'Name', maxLength: 100 }),
+  createStringColumn({ name: 'Key', maxLength: 20 }),
+  createFloatColumn({
+    name: 'X',
+    min: -9_999_999,
+    max: 9_999_999,
+    defaultValue: 0,
+  }),
+  createFloatColumn({
+    name: 'Width',
+    min: 0,
+    max: 9_999_999,
+    defaultValue: 0,
+  }),
+  createFloatColumn({
+    name: 'Y',
+    min: -9_999_999,
+    max: 9_999_999,
+    defaultValue: 0,
+  }),
+  createFloatColumn({
+    name: 'Height',
+    min: 0,
+    max: 9_999_999,
+    defaultValue: 0,
+  }),
+  createFloatColumn({
+    name: 'Z',
+    min: -9_999_999,
+    max: 9_999_999,
+    defaultValue: 0,
+  }),
+  createFloatColumn({
+    name: 'Depth',
+    min: 0,
+    max: 9_999_999,
+    defaultValue: 0,
+  }),
+  createFloatColumn({
+    name: 'Angle',
+    min: -360,
+    max: 360,
+    defaultValue: 0,
+  }),
+  createFloatColumn({
+    name: 'OffsetX',
+    min: -9_999_999,
+    max: 9_999_999,
+    defaultValue: 0,
+  }),
+  createFloatColumn({
+    name: 'OffsetY',
+    min: -9_999_999,
+    max: 9_999_999,
+    defaultValue: 0,
+  }),
+  createFlagColumn({ name: 'Door', defaultValue: 0 }),
+  createEnumColumn({
+    name: 'DoorDirection',
+    enum: DoorDirection,
+    defaultValue: DoorDirection.Left,
+  }),
+  createStringColumn({ name: 'Desc1', maxLength: 1000 }),
+  createStringColumn({ name: 'Desc2', maxLength: 1000 }),
+  createStringColumn({ name: 'Desc3', maxLength: 1000 }),
+  createStringColumn({ name: 'Desc4', maxLength: 1000 }),
+  createStringColumn({ name: 'Desc5', maxLength: 1000 }),
+  createStringColumn({ name: 'Desc6', maxLength: 1000 }),
+  createStringColumn({ name: 'Desc7', maxLength: 1000 }),
+  createStringColumn({ name: 'Desc8', maxLength: 1000 }),
+  createStringColumn({ name: 'Desc9', maxLength: 1000 }),
+  createStringColumn({ name: 'Desc10', maxLength: 1000 }),
+  createFloatColumn({
+    name: 'Value1',
+    min: -9_999_999_999,
+    max: 9_999_999_999,
+    defaultValue: 0,
+  }),
+  createFloatColumn({
+    name: 'Value2',
+    min: -9_999_999_999,
+    max: 9_999_999_999,
+    defaultValue: 0,
+  }),
+  createFloatColumn({
+    name: 'Value3',
+    min: -9_999_999_999,
+    max: 9_999_999_999,
+    defaultValue: 0,
+  }),
+  createFloatColumn({
+    name: 'Value4',
+    min: -9_999_999_999,
+    max: 9_999_999_999,
+    defaultValue: 0,
+  }),
+  createFloatColumn({
+    name: 'Value5',
+    min: -9_999_999_999,
+    max: 9_999_999_999,
+    defaultValue: 0,
+  }),
+  createFloatColumn({
+    name: 'Value6',
+    min: -9_999_999_999,
+    max: 9_999_999_999,
+    defaultValue: 0,
+  }),
+  createFloatColumn({
+    name: 'Value7',
+    min: -9_999_999_999,
+    max: 9_999_999_999,
+    defaultValue: 0,
+  }),
+  createFloatColumn({
+    name: 'Value8',
+    min: -9_999_999_999,
+    max: 9_999_999_999,
+    defaultValue: 0,
+  }),
+  createFloatColumn({
+    name: 'Value9',
+    min: -9_999_999_999,
+    max: 9_999_999_999,
+    defaultValue: 0,
+  }),
+  createFloatColumn({
+    name: 'Value10',
+    min: -9_999_999_999,
+    max: 9_999_999_999,
+    defaultValue: 0,
+  }),
+
+  createFlagColumn({ name: 'Flag1', defaultValue: 0 }),
+  createFlagColumn({ name: 'Flag2', defaultValue: 0 }),
+  createFlagColumn({ name: 'Flag3', defaultValue: 0 }),
+  createFlagColumn({ name: 'Flag4', defaultValue: 0 }),
+  createFlagColumn({ name: 'Flag5', defaultValue: 0 }),
+  createFlagColumn({ name: 'Flag6', defaultValue: 0 }),
+  createFlagColumn({ name: 'Flag7', defaultValue: 0 }),
+  createFlagColumn({ name: 'Flag8', defaultValue: 0 }),
+  createFlagColumn({ name: 'Flag9', defaultValue: 0 }),
+  createFlagColumn({ name: 'Flag10', defaultValue: 0 }),
+  createFloatColumn({
+    name: 'FrameWidth',
+    min: 0,
+    max: 9_999_999,
+    defaultValue: 0,
+  }),
+  createFloatColumn({
+    name: 'FrameHeight',
+    min: 0,
+    max: 9_999_999,
+    defaultValue: 0,
+  }),
+  createFixedValueColumn({ name: 'Changed', value: 0 }),
+  createIntegerColumn({
+    name: 'FrameColor',
+    min: -1,
+    max: 16_777_215,
+    defaultValue: 0,
+  }),
+  createEnumColumn({
+    name: 'FrameFillPattern',
+    enum: FillPattern,
+    defaultValue: FillPattern.Solid,
+  }),
+  createStringColumn({ name: 'PartID', maxLength: 50 }),
+  createStringColumn({ name: 'GLN', maxLength: 17 }),
+  createStringColumn({ name: 'CustomData', maxLength: 10_000 }),
+  createFlagColumn({ name: 'CanSeparate', defaultValue: 1 }),
+];
+
+export type PsaSegment = PsaDefinition<typeof segmentColumns>;
+
+export const toPsaSegment = (data: PsaSegment) =>
+  toPsaRow(data, segmentColumns);
