@@ -20,4 +20,7 @@ version of the format, or your own product, as Vazen TOML, and do not suggest
 that Vazen endorses you.
 
 ProSpace, Blue Yonder, .psa and other third-party names are trademarks of their
-respective owners. Vazen is not affiliated with or endorsed by Blue Yonder.
+respective owners. Vazen is not affiliated with or endorsed by Blue Yonder. PSA
+support was built from PSA files that customers supplied or that were published
+online; column and value names follow ProSpace's field definitions. No Blue
+Yonder software was used.

@@ -28,16 +28,26 @@ existing libraries across languages.
 
 - [`specification/`](specification/) holds every published version of the
   specification.
+- [`examples/`](examples/) holds example files for each version, in a folder
+  named after it.
 - [`typescript/`](typescript/README.md) holds the `@vazen-ai/toml` npm package,
   versioned independently of the format.
+
+The package is built on
+[Effect Schema](https://effect.website/docs/v3/schema/introduction). Each format
+is declared once as a schema, and that one declaration gives its TypeScript
+types, a reader, a writer and, for a file that breaks a rule, an error naming
+the path of the fault. Schemas compose, so a PSA file becomes a project through
+the same declarations that read Vazen TOML. It is the best tool we know for
+stating a format once and having the code follow it.
 
 ## Project status
 
 The [current specification](https://toml.vazen.com/spec) is a draft and open for
-feedback. The `@vazen-ai/toml` package currently writes legacy PSA files only.
-Planned tooling includes reading and writing Vazen TOML in that package, Python
-packages, JSON Schemas, and a web converter and visualiser. See
-[the website](https://toml.vazen.com/) for the current roadmap.
+feedback. The `@vazen-ai/toml` package reads and writes Vazen TOML 0.3.0 and PSA
+files. Planned tooling includes Python packages, JSON Schemas, and a web
+converter and visualiser. See [the website](https://toml.vazen.com/) for the
+current roadmap.
 
 ## Get involved
 

@@ -1,0 +1,154 @@
+schema = "vazen/layout"
+schema_version = "0.3.0"
+name = "Every Field"
+category = "Breakfast cereals"
+
+[[products]]
+ref = "p_planflakes_400"
+name = "Vazen Planflakes breakfast cereal 400 g"
+description = "Vazen Planflakes breakfast cereal, 400 g box"
+gtin = "884400062451"
+form = "box"
+brand = "Vazen"
+
+[products.dimensions]
+width = 190
+height = 280
+depth = 70
+
+[products.images]
+front = "https://example.org/planflakes-400/front.png"
+left = "https://example.org/planflakes-400/left.png"
+right = "https://example.org/planflakes-400/right.png"
+top = "https://example.org/planflakes-400/top.png"
+base = "https://example.org/planflakes-400/base.png"
+
+[products.images.back]
+url = "https://example.org/planflakes-400/back.png"
+
+[products.images.back.crop]
+x = 200
+y = 0
+
+[products._example_org__supplier]
+code = "SUP-001"
+lead_time_days = 3
+
+[[products]]
+ref = "p_planflakes_400_tray"
+name = "Vazen Planflakes breakfast cereal 400 g, tray of 6"
+gtin = "10884400062458"
+form = "tray"
+_vazen__unit_count = 6
+brand = "Vazen"
+
+[products.dimensions]
+width = 400
+height = 290
+depth = 220
+
+[[fixtures]]
+id = "AISLE-12-END"
+name = "Aisle 12 End"
+sort_order = 1
+_example_org__store = "Example Store 12"
+tags = [ "end-of-aisle", "promotional" ]
+
+[fixtures.dimensions]
+width = 1250
+height = 2000
+depth = 570
+
+[[fixtures.equipment]]
+type = "bay"
+sort_order = 1
+_example_org__bay = 1
+
+[fixtures.equipment.position]
+x = 0
+y = 0
+z = 0
+
+[fixtures.equipment.dimensions]
+width = 1250
+height = 2000
+depth = 570
+
+[[fixtures.equipment.equipment]]
+type = "shelf"
+sort_order = 1
+
+[fixtures.equipment.equipment.position]
+x = 0
+y = 260
+z = 0
+
+[fixtures.equipment.equipment.dimensions]
+width = 1250
+height = 400
+depth = 570
+
+[[fixtures.equipment.equipment.sites]]
+orientation = "F"
+sort_order = 1
+_example_org__facing_note = "lead item"
+highlighted = true
+
+[fixtures.equipment.equipment.sites.product]
+ref = "p_planflakes_400"
+
+[fixtures.equipment.equipment.sites.facings]
+wide = 3
+high = 1
+deep = 4
+
+[fixtures.equipment.equipment.sites.position]
+x = 25
+y = 300
+z = 0
+
+[fixtures.equipment.equipment.sites.dimensions]
+width = 780
+height = 260
+depth = 480
+
+[[fixtures.equipment.equipment.sites]]
+orientation = "Fl"
+sort_order = 2
+
+[fixtures.equipment.equipment.sites.product]
+gtin = "10884400062458"
+
+[fixtures.equipment.equipment.sites.facings]
+wide = 1.5
+high = 2
+deep = 2
+
+[fixtures.equipment.equipment.sites.position]
+x = 830
+y = 300
+z = 0
+
+[fixtures.equipment.equipment.sites.dimensions]
+width = 420
+height = 260
+depth = 520
+
+[[fixtures.equipment.equipment]]
+type = "peg"
+sort_order = 2
+
+[fixtures.equipment.equipment.position]
+x = 525
+y = 1500
+z = 0
+
+[fixtures.equipment.equipment.dimensions]
+width = 200
+height = 20
+depth = 300
+
+[_example_org__plan]
+approved = true
+reviewed = 2026-09-27T09:30:00.000Z
+revision = 3
