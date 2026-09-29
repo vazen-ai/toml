@@ -1,0 +1,49 @@
+schema = "vazen/spec"
+schema_version = "0.3.0"
+name = "Dishwash End of Aisle"
+
+[[products]]
+name = "Dishwasher Tablets 50 Pack"
+gtin = "5000000000012"
+dimensions = { width = 190, height = 240, depth = 120 }
+brand = "Example Brand"
+_vazen__group = "dishwasher-tablets-50"
+
+[[products]]
+name = "Dishwasher Tablets 50 Pack, tray of 4"
+gtin = "15000000000019"
+form = "tray"
+brand = "Example Brand"
+_vazen__group = "dishwasher-tablets-50"
+_vazen__unit_count = 4
+
+[[products]]
+name = "Dishwasher Tablets 70 Pack"
+gtin = "5000000000029"
+brand = "Example Brand"
+
+[[fixtures]]
+name = "Aisle 12 End"
+dimensions = { width = 1250, height = 2000, depth = 570 }
+
+[[fixtures.equipment]]
+type = "bay"
+sort_order = 1
+
+[[fixtures.equipment.equipment]]
+type = "shelf"
+sort_order = 1
+
+[[fixtures.equipment.equipment.sites]]
+product = { gtin = "15000000000019", form = "tray" }
+facings = { wide = 2, deep = 2 }
+sort_order = 1
+
+[[fixtures.equipment.equipment]]
+type = "shelf"
+sort_order = 2
+
+[[fixtures.equipment.equipment.sites]]
+product = { gtin = "5000000000029" }
+facings = { wide = 3, deep = 4 }
+sort_order = 1
