@@ -112,7 +112,7 @@ jobs:
             https://registry.npmjs.org/@vazen-ai%2Ftoml > registry.json
           jq -e --arg version "$RELEASE_VERSION" \
             '.name == "@vazen-ai/toml" and (.versions | type == "object" and (has($version) | not))' registry.json
-      - run: npm publish ./package.tgz --ignore-scripts --provenance --access public --tag latest --registry=https://registry.npmjs.org
+      - run: npm publish ./package.tgz --ignore-scripts --provenance --access public --registry=https://registry.npmjs.org
       - name: Verify the registry artifact and provenance
         env:
           RELEASE_INTEGRITY: ${{ needs.verify.outputs.integrity }}
