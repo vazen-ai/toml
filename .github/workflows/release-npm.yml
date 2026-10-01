@@ -1,0 +1,132 @@
+name: Release npm
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: npm-release-${{ github.event.pull_request.number || 'main' }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify npm package
+    if: github.repository == 'vazen-ai/toml'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      artifact-id: ${{ steps.artifact.outputs.artifact-id }}
+      integrity: ${{ steps.pack.outputs.integrity }}
+      publish: ${{ steps.release.outputs.publish }}
+      sha256: ${{ steps.pack.outputs.sha256 }}
+      version: ${{ steps.release.outputs.version }}
+    defaults:
+      run:
+        working-directory: typescript
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '26.8.2'
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run verify
+      - name: Check release version
+        id: release
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync, readFileSync } from 'node:fs';
+          import { checkRelease } from './check-release.ts';
+          const release = await checkRelease(JSON.parse(readFileSync('package.json', 'utf8')));
+          appendFileSync(process.env.GITHUB_OUTPUT, `publish=${release.publish}\nversion=${release.version}\n`);
+          NODE
+      - name: Pack the verified commit
+        id: pack
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          npm pkg set "gitHead=$GITHUB_SHA"
+          cp ../LICENSE-APACHE ../LICENSE-CC-BY ../LICENSING.md .
+          npm pack --ignore-scripts --json > pack.json
+          package=$(jq -er '.[0].filename' pack.json)
+          mv -- "$package" package.tgz
+          tar -xOf package.tgz package/package.json | jq -e \
+            --arg version "$RELEASE_VERSION" --arg commit "$GITHUB_SHA" \
+            '.name == "@vazen-ai/toml" and .version == $version and .gitHead == $commit'
+          printf 'sha256=%s\n' "$(sha256sum package.tgz | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+          printf 'integrity=%s\n' "$(jq -er '.[0].integrity' pack.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        id: artifact
+        if: github.event_name == 'push' && steps.release.outputs.publish == 'true'
+        with:
+          name: npm-package
+          path: typescript/package.tgz
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish npm package
+    needs: verify
+    if: >-
+      github.repository == 'vazen-ai/toml' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.verify.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: npm-release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '26.8.2'
+          package-manager-cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.verify.outputs.artifact-id }}
+          merge-multiple: true
+      # No checkout, install or package scripts in the job that can request a publish token.
+      - name: Check the artifact and release commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA256: ${{ needs.verify.outputs.sha256 }}
+          RELEASE_VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          printf '%s  package.tgz\n' "$RELEASE_SHA256" | sha256sum --check --strict
+          tar -xOf package.tgz package/package.json | jq -e \
+            --arg version "$RELEASE_VERSION" --arg commit "$GITHUB_SHA" \
+            '.name == "@vazen-ai/toml" and .version == $version and .gitHead == $commit and
+             .repository.url == "git+https://github.com/vazen-ai/toml.git" and
+             .publishConfig == {"access": "public"}'
+          test "$(gh api repos/vazen-ai/toml/git/ref/heads/main --jq .object.sha)" = "$GITHUB_SHA"
+          curl --fail --silent --show-error --max-time 30 \
+            https://registry.npmjs.org/@vazen-ai%2Ftoml > registry.json
+          jq -e --arg version "$RELEASE_VERSION" \
+            '.name == "@vazen-ai/toml" and (.versions | type == "object" and (has($version) | not))' registry.json
+      - run: npm publish ./package.tgz --ignore-scripts --provenance --access public --tag latest --registry=https://registry.npmjs.org
+      - name: Verify the registry artifact and provenance
+        env:
+          RELEASE_INTEGRITY: ${{ needs.verify.outputs.integrity }}
+          RELEASE_VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          for attempt in $(seq 1 30); do
+            echo "Checking published package, attempt $attempt/30"
+            if curl --fail --silent --show-error --max-time 10 \
+              "https://registry.npmjs.org/@vazen-ai%2Ftoml/$RELEASE_VERSION" > published.json &&
+              jq -e --arg integrity "$RELEASE_INTEGRITY" \
+                '.dist.integrity == $integrity and (.dist.attestations.provenance | type == "object")' published.json; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'Published package or provenance could not be verified.' >&2
+          exit 1
