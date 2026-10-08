@@ -1,23 +1,25 @@
 import { Schema as S } from 'effect';
 
-import { VAZEN_KNOWN_KEYS_ONLY, VazenAttributes } from './vazen-attributes';
+import { PsaMessage } from './psa';
+import { knownKeysOnly, VazenAttributes } from './vazen-attributes';
 import { VazenFixture } from './vazen-fixture';
 import { VazenProduct } from './vazen-product';
 
-// The file a project was read from. `PsaData` holds `declaredVersion` alone,
-// since a PSA file has one format; a project may come from any.
-const VazenProjectSource = S.Struct({
+/** The file a project was read from. */
+export const VazenProjectSource = S.Struct({
   /**
    * The version the file declares, if it gives one. A file is written as the
    * version its schema writes, whatever this holds.
    */
-  declaredVersion: S.OptionFromSelf(S.String),
+  declaredVersion: S.Option(S.String),
   /**
    * The file's format, such as `'vazen-toml'` or `'psa'`: an open string, so a
    * reader for another format can name its own.
    */
   format: S.String,
-}).annotations({ identifier: 'VazenProjectSource', ...VAZEN_KNOWN_KEYS_ONLY });
+})
+  .pipe(knownKeysOnly)
+  .annotate({ identifier: 'VazenProjectSource' });
 
 /**
  * A project: its products and fixtures, whatever format and version it was read
@@ -31,12 +33,17 @@ const VazenProjectSource = S.Struct({
 export const VazenProject = S.Struct({
   attributes: VazenAttributes,
   fixtures: S.Array(VazenFixture),
-  name: S.OptionFromSelf(S.String),
+  /** Findings from reading or processing the project. Writers do not store them. */
+  messages: S.Array(PsaMessage),
+
+  name: S.Option(S.String),
   products: S.Array(VazenProduct),
   /** The file the project was read from, if it was read from one. */
-  source: S.OptionFromSelf(VazenProjectSource),
-  stage: S.Literal('spec', 'layout'),
-}).annotations({ identifier: 'VazenProject', ...VAZEN_KNOWN_KEYS_ONLY });
+  source: S.Option(VazenProjectSource),
+  stage: S.Literals(['spec', 'layout']),
+})
+  .pipe(knownKeysOnly)
+  .annotate({ identifier: 'VazenProject' });
 
 export type VazenProject = typeof VazenProject.Type;
 export type VazenProjectSource = typeof VazenProjectSource.Type;

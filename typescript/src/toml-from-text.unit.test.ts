@@ -1,11 +1,11 @@
-import { Either, Predicate, Record, Schema as S } from 'effect';
+import { Predicate, Record, Result, Schema as S } from 'effect';
 import { describe, expect, it } from 'vitest';
 
 import { TomlFromText, TomlTable, type TomlValue } from './toml-from-text';
 
-const TomlTableFromText = S.compose(TomlFromText, TomlTable);
-const decode = S.decodeEither(TomlTableFromText);
-const encode = S.encodeEither(TomlTableFromText);
+const TomlTableFromText = TomlFromText.pipe(S.decodeTo(TomlTable));
+const decode = S.decodeResult(TomlTableFromText);
+const encode = S.encodeResult(TomlTableFromText);
 
 // Every kind of value TOML holds, in the places a writer treats differently.
 const EVERY_VALUE = String.raw`title = "Quote \" backslash \\ tab \t newline \n delete \u007f café"
@@ -47,27 +47,53 @@ const withDatesAsText = (value: TomlValue): unknown =>
     ? value.toISOString()
     : Array.isArray(value)
       ? value.map(withDatesAsText)
-      : Predicate.isRecord(value)
+      : Predicate.isObject(value)
         ? Record.map(value, withDatesAsText)
         : value;
 
 describe('TomlFromText', () => {
   it('should write every kind of value so that it reads back the same', () => {
-    const table = Either.getOrThrow(decode(EVERY_VALUE));
-    const written = Either.getOrThrow(encode(table));
+    const table = Result.getOrThrow(decode(EVERY_VALUE));
+    const written = Result.getOrThrow(encode(table));
 
-    expect(withDatesAsText(Either.getOrThrow(decode(written)))).toEqual(
+    expect(withDatesAsText(Result.getOrThrow(decode(written)))).toEqual(
       withDatesAsText(table),
     );
   });
 
   it('should refuse an integer beyond JavaScript’s safe range rather than round it', () => {
-    expect(Either.isLeft(decode('width = 9007199254740993\n'))).toBe(true);
+    expect(Result.isFailure(decode('width = 9007199254740993\n'))).toBe(true);
   });
 
   it('should report a syntax error with its line', () => {
     const decoded = decode('name = "Example"\nwidth = = 3\n');
 
-    expect(Either.isLeft(decoded) && decoded.left.message).toContain('2:');
+    expect(Result.isFailure(decoded) && decoded.failure.message).toContain(
+      '2:',
+    );
+  });
+
+  it.each([
+    ['at the top', '__proto__ = "Dummy"\n'],
+    ['in a nested table', '[a]\n__proto__ = { x = 1 }\n'],
+    ['in a list of tables', '[[a]]\n__proto__ = "Dummy"\n'],
+  ])('should refuse `__proto__` as a key %s', (_, text) => {
+    const decoded = decode(text);
+
+    expect(Result.isFailure(decoded) && decoded.failure.message).toContain(
+      '["__proto__"]',
+    );
+  });
+
+  it('should keep `constructor` and `toString` as keys, with a plain prototype', () => {
+    const table = Result.getOrThrow(
+      decode('constructor = "C"\n[a]\ntoString = "T"\n'),
+    );
+
+    expect(table).toEqual({ a: { toString: 'T' }, constructor: 'C' });
+    expect(Object.getPrototypeOf(table)).toBe(Object.prototype);
+    expect(Result.getOrThrow(decode(Result.getOrThrow(encode(table))))).toEqual(
+      table,
+    );
   });
 });

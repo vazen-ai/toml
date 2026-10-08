@@ -1,6 +1,6 @@
 import { Schema as S } from 'effect';
 
-import { VAZEN_KNOWN_KEYS_ONLY } from './vazen-attributes';
+import { knownKeysOnly } from './vazen-attributes';
 
 /**
  * A point in the fixture's frame, in millimetres. Every position is absolute,
@@ -11,7 +11,9 @@ export const VazenPosition = S.Struct({
   x: S.Finite,
   y: S.Finite,
   z: S.Finite,
-}).annotations({ identifier: 'VazenPosition', ...VAZEN_KNOWN_KEYS_ONLY });
+})
+  .pipe(knownKeysOnly)
+  .annotate({ identifier: 'VazenPosition' });
 
 export type VazenPosition = typeof VazenPosition.Type;
 
@@ -25,7 +27,9 @@ export const VazenDimensions = S.Struct({
   width: S.Finite,
   height: S.Finite,
   depth: S.Finite,
-}).annotations({ identifier: 'VazenDimensions', ...VAZEN_KNOWN_KEYS_ONLY });
+})
+  .pipe(knownKeysOnly)
+  .annotate({ identifier: 'VazenDimensions' });
 
 export type VazenDimensions = typeof VazenDimensions.Type;
 
@@ -34,9 +38,11 @@ export type VazenDimensions = typeof VazenDimensions.Type;
  * fractional, and in a spec may be omitted for its default of 1.
  */
 export const VazenFacings = S.Struct({
-  deep: S.OptionFromSelf(S.Finite),
-  high: S.OptionFromSelf(S.Finite),
-  wide: S.OptionFromSelf(S.Finite),
-}).annotations({ identifier: 'VazenFacings', ...VAZEN_KNOWN_KEYS_ONLY });
+  deep: S.Option(S.Finite),
+  high: S.Option(S.Finite),
+  wide: S.Option(S.Finite),
+})
+  .pipe(knownKeysOnly)
+  .annotate({ identifier: 'VazenFacings' });
 
 export type VazenFacings = typeof VazenFacings.Type;

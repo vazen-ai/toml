@@ -18,8 +18,10 @@ export const groupUnderHeads = <Item, Head extends Item, Group>({
   leading: ReadonlyArray<Exclude<Item, Head>>;
 }> => {
   const isFollower = (item: Item): item is Exclude<Item, Head> => !isHead(item);
-  const heads = A.filterMap(items, (item, index) =>
-    isHead(item) ? Option.some({ head: item, index }) : Option.none(),
+  const heads = A.getSomes(
+    A.map(items, (item, index) =>
+      isHead(item) ? Option.some({ head: item, index }) : Option.none(),
+    ),
   );
   return {
     groups: heads.map(({ head, index }, position) =>

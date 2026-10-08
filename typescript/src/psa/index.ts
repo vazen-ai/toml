@@ -30,7 +30,11 @@ export {
   PsaUsePerformanceFromCode,
 } from './psa-code-lists';
 export { PsaUnlistedCode } from './psa-cells';
-export { PsaCompromise } from './psa-compromises';
+export {
+  makeMillimetresFromPsaLength,
+  makePsaLengthFromMillimetres,
+} from './psa-lengths';
+export { PsaMessage } from './psa-messages';
 export {
   decodePsaDataFromPsaFile,
   encodePsaFileFromPsaData,
@@ -43,31 +47,37 @@ export {
   type PsaPlanogramSection,
 } from './psa-data';
 export {
+  PSA_EMPTY_FIXTURE,
   PSA_FIXTURE_DEFAULTS,
   PsaFixture,
   PsaFixtureFromPsaRow,
 } from './psa-fixture';
 export {
+  PSA_EMPTY_PERFORMANCE,
   PSA_PERFORMANCE_DEFAULTS,
   PsaPerformance,
   PsaPerformanceFromPsaRow,
 } from './psa-performance';
 export {
+  PSA_EMPTY_PLANOGRAM,
   PSA_PLANOGRAM_DEFAULTS,
   PsaPlanogram,
   PsaPlanogramFromPsaRow,
 } from './psa-planogram';
 export {
+  PSA_EMPTY_POSITION,
   PSA_POSITION_DEFAULTS,
   PsaPosition,
   PsaPositionFromPsaRow,
 } from './psa-position';
 export {
+  PSA_EMPTY_PRODUCT,
   PSA_PRODUCT_DEFAULTS,
   PsaProduct,
   PsaProductFromPsaRow,
 } from './psa-product';
 export {
+  PSA_EMPTY_PROJECT,
   PSA_PROJECT_DEFAULTS,
   PsaProject,
   PsaProjectFromPsaRow,
@@ -75,6 +85,7 @@ export {
 export { PsaRowsFromPsaLines } from './psa-rows-from-psa-lines';
 export { PsaRow, PsaUnknownRow, type PsaRowDefaults } from './psa-rows';
 export {
+  PSA_EMPTY_SEGMENT,
   PSA_SEGMENT_DEFAULTS,
   PsaSegment,
   PsaSegmentFromPsaRow,

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Array as A, Either, Option, Schema as S, String as Str } from 'effect';
+import { Array as A, Option, Result, Schema as S, String as Str } from 'effect';
 import { describe, expect, it } from 'vitest';
 
 import type { PsaData } from './psa-data';
@@ -20,7 +20,7 @@ import {
 const VERSION = '2024.4.0';
 
 const decodeSync = S.decodeUnknownSync(PsaDataFromPsaText);
-const decodeEither = S.decodeUnknownEither(PsaDataFromPsaText);
+const decodeEither = S.decodeUnknownResult(PsaDataFromPsaText);
 const encodeSync = S.encodeSync(PsaDataFromPsaText);
 
 // Everything in src/psa ships publicly, so the test files are made up.
@@ -77,9 +77,9 @@ const getLine = ({
   Str.split(text, '\r\n').find((line) => line.startsWith(`${_tag},`));
 
 const getMessage = (text: string): string =>
-  Either.match(decodeEither(text), {
-    onLeft: (error) => error.message,
-    onRight: () => '',
+  Result.match(decodeEither(text), {
+    onFailure: (error) => error.message,
+    onSuccess: () => '',
   });
 
 describe('PsaDataFromPsaText', () => {
@@ -142,7 +142,7 @@ describe('PsaDataFromPsaText', () => {
     (name) => {
       const text = readTestData(name);
       const file = decodeSync(text);
-      expect(file.compromises).toEqual([]);
+      expect(file.messages).toEqual([]);
       const writtenText = encodeSync(file);
       // The lines below compare every cell as a number where it reads as one,
       // so this is what holds text such as `0123` exactly.
@@ -309,7 +309,7 @@ describe('PsaDataFromPsaText', () => {
       Option.some('2'),
       Option.some('4'),
     ]);
-    expect(file.compromises).toEqual([
+    expect(file.messages).toEqual([
       { _tag: 'UnlistedWidth', rows: [1], type: 'Project', width: 210 },
       { _tag: 'UnlistedWidth', rows: [1], type: 'Product', width: 280 },
       { _tag: 'UnlistedWidth', rows: [2], type: 'Product', width: 2 },
@@ -351,8 +351,44 @@ describe('PsaDataFromPsaText', () => {
     expect(file.planograms[0]?.fixtures[0]?.fixture.type).toEqual(
       Option.some({ _tag: 'UnlistedCode', code: '99' }),
     );
-    expect(file.compromises).toEqual([]);
+    expect(file.messages).toEqual([]);
     expect(encodeSync(file)).toBe(text);
+  });
+
+  // Position column 56 is Merch X Size: 0 is default and 1 is normal.
+  const positionsSized = (...sizes: ReadonlyArray<string>) =>
+    fileFromRows(
+      row({ _tag: 'Planogram' }),
+      row({ _tag: 'Fixture' }),
+      ...sizes.map((size) => row({ _tag: 'Position', cells: { 56: size } })),
+    );
+  const sizesOf = (file: PsaData) =>
+    file.planograms[0]?.fixtures[0]?.positions.map(
+      (position) => position.merch_x_size,
+    );
+
+  it('reads a code spelt with a zero fraction as the whole number, and writes it back as that', () => {
+    const file = decodeSync(positionsSized('0.00', '1.00', '99.00'));
+    expect(sizesOf(file)).toEqual([
+      Option.some('default'),
+      Option.some('normal'),
+      Option.some({ _tag: 'UnlistedCode', code: '99' }),
+    ]);
+    expect(file.messages).toEqual([]);
+    expect(encodeSync(file)).toBe(positionsSized('0', '1', '99'));
+  });
+
+  it('reads a code with a fraction that is not zero, or no digit after its point, as unreadable', () => {
+    const file = decodeSync(positionsSized('0.50', '1.'));
+    expect(sizesOf(file)).toEqual([Option.none(), Option.none()]);
+    expect(file.messages).toEqual([
+      {
+        _tag: 'UnreadCells',
+        column: 'merch_x_size',
+        rows: [1, 2],
+        type: 'Position',
+      },
+    ]);
   });
 
   it('reads a cell its column cannot read as empty, and lists it', () => {
@@ -372,7 +408,7 @@ describe('PsaDataFromPsaText', () => {
       upc: Option.some('2'),
       width: Option.none(),
     });
-    expect(file.compromises).toEqual([
+    expect(file.messages).toEqual([
       { _tag: 'UnreadCells', column: 'width', rows: [2], type: 'Product' },
       { _tag: 'UnreadCells', column: 'flag_1', rows: [2], type: 'Product' },
       {
@@ -392,7 +428,7 @@ describe('PsaDataFromPsaText', () => {
       ),
     );
     expect(file.products).toHaveLength(2);
-    expect(file.compromises).toEqual([
+    expect(file.messages).toEqual([
       { _tag: 'UnlistedWidth', rows: [1, 2], type: 'Product', width: 327 },
       { _tag: 'DroppedCells', rows: [1], type: 'Product' },
     ]);
@@ -416,7 +452,7 @@ describe('PsaDataFromPsaText', () => {
         fixtures.flatMap(({ positions }) => positions.map(({ upc }) => upc)),
       ),
     ).toEqual([[Option.some('1')], [Option.some('3')]]);
-    expect(file.compromises).toEqual([
+    expect(file.messages).toEqual([
       { _tag: 'IgnoredRows', rows: [2], type: 'Position' },
     ]);
   });
@@ -494,8 +530,8 @@ describe('PsaDataFromPsaText', () => {
       ),
     );
     expect(
-      Either.getLeft(
-        S.encodeEither(PsaDataFromPsaText)({
+      Result.getFailure(
+        S.encodeResult(PsaDataFromPsaText)({
           ...file,
           declaredVersion: Option.some('2017.2.0'),
         }),
@@ -562,7 +598,7 @@ describe('PsaDataFromPsaText', () => {
           width: Option.some(NaN),
         })),
       }),
-      message: /Expected a finite number, actual NaN/,
+      message: /Expected a finite number/,
       written: 'a number that is not finite',
     },
     {
@@ -593,9 +629,9 @@ describe('PsaDataFromPsaText', () => {
         ),
       );
       expect(
-        Either.getLeft(S.encodeEither(PsaDataFromPsaText)(change(file))).pipe(
-          Option.map(({ message }) => message),
-        ),
+        Result.getFailure(
+          S.encodeResult(PsaDataFromPsaText)(change(file)),
+        ).pipe(Option.map(({ message }) => message)),
       ).toEqual(Option.some(expect.stringMatching(message)));
     },
   );
@@ -608,17 +644,20 @@ describe('PsaDataFromPsaBytes', () => {
     fileFromRows(row({ _tag: 'Product', cells: { 0: '1', 2: name } }));
 
   it('reads Windows-1252 bytes above 0x7F, and writes them back', () => {
-    // 0x80 is the euro sign in Windows-1252; 0x81 is one of its five undefined
-    // bytes.
+    // Bytes 0x80 to 0x9F are where Windows-1252 differs from Latin-1; five of
+    // them are undefined.
     const [before, after] = Str.split(productNamed('Price §'), '§');
     const bytes = Uint8Array.from([
       ...Buffer.from(before, 'latin1'),
-      0x80,
-      0x81,
+      ...A.range(0x80, 0x9f),
       ...Buffer.from(after ?? '', 'latin1'),
     ]);
     const file = decodeBytes(bytes);
-    expect(file.products[0]?.name).toEqual(Option.some('Price €\u0081'));
+    expect(file.products[0]?.name).toEqual(
+      Option.some(
+        'Price €\u0081‚ƒ„…†‡ˆ‰Š‹Œ\u008DŽ\u008F\u0090‘’“”•–—˜™š›œ\u009DžŸ',
+      ),
+    );
     expect(encodeBytes(file)).toEqual(bytes);
   });
 
@@ -648,7 +687,7 @@ describe('PsaDataFromPsaBytes', () => {
       ...Buffer.from(productNamed('Café'), 'latin1'),
     ]);
     expect(
-      Either.getLeft(S.decodeUnknownEither(PsaDataFromPsaBytes)(bytes)).pipe(
+      Result.getFailure(S.decodeUnknownResult(PsaDataFromPsaBytes)(bytes)).pipe(
         Option.map(({ message }) => message),
       ),
     ).toEqual(
@@ -686,7 +725,7 @@ describe('PsaDataFromPsaBytes', () => {
       Uint8Array.from(Buffer.from(productNamed('Łódź'), 'utf8')),
     );
     expect(
-      Either.getLeft(S.encodeEither(PsaDataFromPsaBytes)(file)).pipe(
+      Result.getFailure(S.encodeResult(PsaDataFromPsaBytes)(file)).pipe(
         Option.map(({ message }) => message),
       ),
     ).toEqual(Option.some(expect.stringMatching(/line 5 holds "Ł"/)));

@@ -1,13 +1,17 @@
 {
   "name": "@vazen-ai/toml",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Read and write Vazen TOML 0.3.0 files, as TOML or JSON, and ProSpace PSA planogram files.",
   "keywords": [
+    "blue-yonder",
+    "jda",
     "planogram",
-    "retail",
+    "planogram-parser",
+    "prospace",
     "psa",
-    "vazen",
-    "toml"
+    "retail",
+    "toml",
+    "vazen"
   ],
   "homepage": "https://toml.vazen.com/",
   "bugs": "https://github.com/vazen-ai/toml/issues",
@@ -30,6 +34,7 @@
   },
   "types": "./dist/index.d.mts",
   "files": [
+    "CHANGELOG.md",
     "dist",
     "LICENSE-APACHE",
     "LICENSE-CC-BY",
@@ -48,15 +53,15 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
-    "@types/node": "26.6.1",
-    "effect": "3.22.2",
+    "@types/node": "26.6.3",
+    "effect": "4.0.0",
     "publint": "0.3.24",
     "tsdown": "0.23.0",
     "typescript": "6.0.3",
-    "vitest": "4.1.11"
+    "vitest": "5.0.3"
   },
   "peerDependencies": {
-    "effect": "^3.14.8"
+    "effect": "^4.0.0"
   },
   "publishConfig": {
     "access": "public"

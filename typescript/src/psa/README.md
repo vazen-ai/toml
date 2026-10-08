@@ -9,12 +9,12 @@ back as a PSA file.
 - `decodePsaDataFromPsaFile` reads bytes as `PsaDataFromPsaBytes` does, and
   `encodePsaFileFromPsaData({ data, version })` writes them as the version
   given, else as the data declares when that version's rows hold every value,
-  else 2024.4.0. Each throws a `ParseError` where it fails.
+  else 2024.4.0. Each throws a `SchemaError` where it fails.
 
 ```text
 PsaData
 ├── declaredVersion         string (optional)
-├── compromises             PsaCompromise (list)
+├── messages                PsaMessage (list)
 ├── project                 PsaProject
 ├── products                PsaProduct (list)
 └── planograms              PsaPlanogramSection (list)
@@ -32,8 +32,8 @@ A file is read as UTF-8 if it is valid UTF-8, and as Windows-1252 if not. Each
 row is read by its type's columns, whatever version the file declares. A row of
 a type this package does not read is kept in the `unknownRowsAfter` of the
 record before it. What reading gives up, such as a cell its column cannot read,
-is listed in `compromises`, and [`PsaCompromise`](psa-compromises.ts) says what
-each kind means.
+is listed in `messages`, and [`PsaMessage`](psa-messages.ts) says what each kind
+means.
 
 Reading refuses a file that is not a PSA file, one that starts with a UTF-8
 byte-order mark but is not UTF-8, one whose first row is not its only Project
@@ -43,12 +43,14 @@ row, and one with a record other than a product before the first planogram.
 
 Every file is written in Windows-1252. Writing refuses anything that would not
 read back as the same records, such as a value in a column the version written
-does not have, or a character Windows-1252 cannot hold. Two exceptions: text is
-written in Unicode's composed form, so a letter and a combining accent become
-the one character Windows-1252 has for them, and U+FFFD is written as `?`.
+does not have, a character Windows-1252 cannot hold, or text whose Windows-1252
+bytes are also valid UTF-8, such as `Ã©`, which reading would take as `é`. Two
+exceptions: text is written in Unicode's composed form, so a letter and a
+combining accent become the one character Windows-1252 has for them, and U+FFFD
+is written as `?`.
 
-So a file read with no compromises and written back holds the same records, but
-for those two. Its text may differ in form, such as how numbers are written, the
+So a file read with no messages and written back holds the same records, but for
+those two. Its text may differ in form, such as how numbers are written, the
 line endings and the order of rows.
 
 ## Provenance

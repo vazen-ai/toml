@@ -1,10 +1,18 @@
-import { Array as A, Option, Predicate, Record, Schema as S } from 'effect';
+import {
+  Array as A,
+  Option,
+  Predicate,
+  Record,
+  Schema as S,
+  SchemaGetter,
+} from 'effect';
 import { TomlDate } from 'smol-toml';
 
 import type { VazenTomlProjectV0_3_0 } from './specification/vazen-toml-project-v0-3-0';
 import type { TomlTable, TomlValue } from './toml-from-text';
-import type { VazenAttributeScalar } from './vazen-attributes';
+import { PSA_KEY_PREFIX, type VazenAttributeScalar } from './vazen-attributes';
 import type { VazenEquipment } from './vazen-equipment';
+import { VazenProduct } from './vazen-product';
 import { VazenProject } from './vazen-project';
 import {
   VazenProjectFromVazenTomlProject,
@@ -16,18 +24,28 @@ import {
 
 const FORMAT = 'vazen-json';
 
+// A product's standard keys hold no date, so a selector's text under one is
+// text, as the field it must match is. `description` is the one held in the
+// attributes.
+const PRODUCT_STANDARD_KEYS: ReadonlySet<string> = new Set([
+  ...Record.keys(VazenProduct.fields),
+  'description',
+]);
+
 // A TOML number can be `nan` or `inf`, which JSON cannot hold, and
 // `JSON.parse` rounds an integer beyond JavaScript's safe range, which the TOML
 // reader refuses. Both are refused here, rather than written as `null` or read
 // rounded.
-const JsonFromText = S.parseJson({ space: 2 }).pipe(
-  S.compose(
+const JsonFromText = S.fromJsonString(S.Unknown, { space: 2 }).pipe(
+  S.decodeTo(
     S.Unknown.pipe(
-      S.filter((value) =>
-        A.match(inexactNumbersIn(value), {
-          onEmpty: () => true,
-          onNonEmpty: ([number]) => `${number} has no exact JSON form`,
-        }),
+      S.check(
+        S.makeFilter((value) =>
+          A.match(inexactNumbersIn(value), {
+            onEmpty: () => true,
+            onNonEmpty: ([number]) => `${number} has no exact JSON form`,
+          }),
+        ),
       ),
     ),
   ),
@@ -40,29 +58,34 @@ const JsonFromText = S.parseJson({ space: 2 }).pipe(
  * date is written as RFC 3339 text with milliseconds, such as
  * `"2026-09-27T09:30:00.000Z"`, `"2026-09-27"` or `"09:30:00.000"`. Text in
  * exactly such a form reads as a date, but only in an attribute or a product
- * selector. Writing refuses `nan` and `inf`, which JSON cannot hold. Reading
- * refuses an integer beyond JavaScript's safe range.
+ * selector, and not under a `_psa__` key, which holds a PSA cell, nor under a
+ * product's standard key, which holds text. So text and a date in the same form
+ * read back as one date, and a selector for the text also matches a product
+ * with the date. Writing refuses `nan` and `inf`, which JSON cannot hold.
+ * Reading refuses an integer beyond JavaScript's safe range, and a table
+ * holding `__proto__` as a key.
  */
-export const VazenProjectFromJsonText: S.Schema<VazenProject, string> =
+export const VazenProjectFromJsonText: S.Codec<VazenProject, string> =
   JsonFromText.pipe(
-    S.compose(VazenProjectFromVazenTomlProject),
-    S.compose(
-      S.transform(VazenProject, VazenProject, {
-        decode: (project) => ({
-          ...withDates(project),
-          source: Option.map(project.source, (source) => ({
-            ...source,
-            format: FORMAT,
+    S.decodeTo(VazenProjectFromVazenTomlProject),
+    S.decodeTo(
+      VazenProject.pipe(
+        S.decodeTo(VazenProject, {
+          decode: SchemaGetter.transform((project) => ({
+            ...withDates(project),
+            source: Option.map(project.source, (source) => ({
+              ...source,
+              format: FORMAT,
+            })),
           })),
+          encode: SchemaGetter.transform((project) => project),
         }),
-        encode: (project) => project,
-        strict: true,
-      }),
+      ),
     ),
-  ).annotations({ identifier: 'VazenProjectFromJsonText' });
+  ).annotate({ identifier: 'VazenProjectFromJsonText' });
 
 /**
- * Reads the text of a `.vazen.json` file as its tables. Throws a `ParseError`
+ * Reads the text of a `.vazen.json` file as its tables. Throws a `SchemaError`
  * saying what it could not read.
  */
 export const decodeVazenProjectFromJsonFile = (
@@ -75,7 +98,7 @@ export const decodeVazenProjectFromJsonFile = (
 /**
  * Writes a project's tables as the text of a `.vazen.json` file. It writes
  * 0.3.0, unless `version` names another version `VazenVersion` lists. Throws a
- * `ParseError` saying what it could not write.
+ * `SchemaError` saying what it could not write.
  */
 export const encodeJsonFileFromVazenProject = (
   options: Readonly<{
@@ -91,13 +114,14 @@ const inexactNumbersIn = (value: unknown): ReadonlyArray<number> => {
       ? []
       : [value];
   }
-  return Predicate.isObject(value) && !Predicate.isDate(value)
+  return Predicate.isObjectKeyword(value) && !Predicate.isDate(value)
     ? Object.values(value).flatMap(inexactNumbersIn)
     : [];
 };
 
-// The text is a date only when the date writes back as the same text, so
-// reading and writing JSON changes no value.
+// The text is a date only when the date writes back as the same text, so a
+// date survives JSON. Text that was already in that form reads back as a date
+// too.
 const dateFromText = (text: string): string | Date => {
   const date = new TomlDate(text);
   return date.isValid() && date.toISOString() === text ? date : text;
@@ -107,7 +131,7 @@ const dateIn = (value: TomlValue): TomlValue => {
   if (Predicate.isString(value)) {
     return dateFromText(value);
   }
-  if (Predicate.isDate(value) || !Predicate.isObject(value)) {
+  if (Predicate.isDate(value) || !Predicate.isObjectKeyword(value)) {
     return value;
   }
   return isList(value) ? value.map(dateIn) : datesIn(value);
@@ -117,10 +141,22 @@ const dateIn = (value: TomlValue): TomlValue => {
 const isList: (value: TomlValue) => value is ReadonlyArray<TomlValue> =
   Array.isArray;
 
-const datesIn = (table: TomlTable): TomlTable => Record.map(table, dateIn);
+// No PSA column holds a date, so text under a PSA column's key is text.
+const isPsaKey = (key: string) => key.startsWith(PSA_KEY_PREFIX);
 
-const scalarDateIn = (value: VazenAttributeScalar): VazenAttributeScalar =>
-  Predicate.isString(value) ? dateFromText(value) : value;
+const datesIn = (table: TomlTable): TomlTable =>
+  Record.map(table, (value, key) => (isPsaKey(key) ? value : dateIn(value)));
+
+const isProductTextKey = (key: string) =>
+  PRODUCT_STANDARD_KEYS.has(key) || isPsaKey(key);
+
+const productDateIn = (
+  value: VazenAttributeScalar,
+  key: string,
+): VazenAttributeScalar =>
+  Predicate.isString(value) && !isProductTextKey(key)
+    ? dateFromText(value)
+    : value;
 
 // Only attributes and product selectors hold dates. A standard key's text stays
 // text.
@@ -134,9 +170,8 @@ const withDates = (project: VazenProject): VazenProject => ({
   })),
   products: project.products.map((product) => ({
     ...product,
-    // `description` is a standard key of the file, held in the attributes.
     attributes: Record.map(product.attributes, (value, key) =>
-      key === 'description' ? value : dateIn(value),
+      isProductTextKey(key) ? value : dateIn(value),
     ),
     images: Option.map(product.images, (images) =>
       Record.map(images, (image) =>
@@ -156,6 +191,6 @@ const equipmentWithDates = (equipment: VazenEquipment): VazenEquipment => ({
   sites: equipment.sites.map((site) => ({
     ...site,
     attributes: datesIn(site.attributes),
-    product: Record.map(site.product, scalarDateIn),
+    product: Record.map(site.product, productDateIn),
   })),
 });

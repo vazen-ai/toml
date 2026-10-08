@@ -1,7 +1,7 @@
 import { Schema as S } from 'effect';
 
-import { PsaCompromise } from './psa-compromises';
 import { PsaFixture } from './psa-fixture';
+import { PsaMessage } from './psa-messages';
 import { PsaPerformance } from './psa-performance';
 import { PsaPlanogram } from './psa-planogram';
 import { PsaPosition } from './psa-position';
@@ -10,15 +10,15 @@ import { PsaProject } from './psa-project';
 import { PsaSegment } from './psa-segment';
 
 /** A row read by its type's columns. */
-export const PsaRecord = S.Union(
-  S.typeSchema(PsaFixture),
-  S.typeSchema(PsaPerformance),
-  S.typeSchema(PsaPlanogram),
-  S.typeSchema(PsaPosition),
-  S.typeSchema(PsaProduct),
-  S.typeSchema(PsaProject),
-  S.typeSchema(PsaSegment),
-).annotations({ identifier: 'PsaRecord' });
+export const PsaRecord = S.Union([
+  S.toType(PsaFixture),
+  S.toType(PsaPerformance),
+  S.toType(PsaPlanogram),
+  S.toType(PsaPosition),
+  S.toType(PsaProduct),
+  S.toType(PsaProject),
+  S.toType(PsaSegment),
+]).annotate({ identifier: 'PsaRecord' });
 export type PsaRecord = typeof PsaRecord.Type;
 
 /**
@@ -26,10 +26,10 @@ export type PsaRecord = typeof PsaRecord.Type;
  * reading them gave up.
  */
 export const PsaRecords = S.Struct({
-  compromises: S.Array(PsaCompromise),
-  declaredVersion: S.OptionFromSelf(S.String),
+  declaredVersion: S.Option(S.String),
+  messages: S.Array(PsaMessage),
   records: S.Array(PsaRecord),
-}).annotations({ identifier: 'PsaRecords' });
+}).annotate({ identifier: 'PsaRecords' });
 export type PsaRecords = typeof PsaRecords.Type;
 
 /** Whether a record is of one of the given types. */

@@ -1,10 +1,11 @@
 import {
   Array as A,
-  Either,
-  ParseResult,
-  pipe,
+  Effect,
   Record,
   Schema as S,
+  SchemaGetter,
+  SchemaIssue,
+  SchemaParser,
   type Option,
 } from 'effect';
 
@@ -15,29 +16,35 @@ export const PsaUnknownRow = S.Struct({
   // A row of a type this package reads would be read back as a record, and
   // one starting `;` as a comment, which reading drops.
   _tag: S.String.pipe(
-    S.filter(
-      (type) =>
-        !S.is(PsaRecordType)(type) ||
-        `a ${type} row is read as a record, so it cannot be kept as a row of a type this package does not read`,
+    S.check(
+      S.makeFilter(
+        (type) =>
+          !S.is(PsaRecordType)(type) ||
+          `a ${type} row is read as a record, so it cannot be kept as a row of a type this package does not read`,
+      ),
     ),
-    S.filter(
-      (type) =>
-        !type.startsWith(';') ||
-        'a row starting ";" is read as a comment, so it cannot be kept as a row',
+    S.check(
+      S.makeFilter(
+        (type) =>
+          !type.startsWith(';') ||
+          'a row starting ";" is read as a comment, so it cannot be kept as a row',
+      ),
     ),
   ),
   cells: S.Array(S.String),
 })
   .pipe(
     // An empty row would be written as a blank line, which reading drops.
-    S.filter(
-      ({ _tag, cells }) =>
-        _tag !== '' ||
-        cells.length > 0 ||
-        'an empty row is read as a blank line, so it cannot be kept as a row',
+    S.check(
+      S.makeFilter(
+        ({ _tag, cells }) =>
+          _tag !== '' ||
+          cells.length > 0 ||
+          'an empty row is read as a blank line, so it cannot be kept as a row',
+      ),
     ),
   )
-  .annotations({ identifier: 'PsaUnknownRow' });
+  .annotate({ identifier: 'PsaUnknownRow' });
 export type PsaUnknownRow = typeof PsaUnknownRow.Type;
 
 /**
@@ -52,16 +59,16 @@ export const PsaRow = S.Struct({
    * one. They are written back in the same place.
    */
   unknownRowsAfter: S.Array(PsaUnknownRow),
-}).annotations({ identifier: 'PsaRow' });
+}).annotate({ identifier: 'PsaRow' });
 export type PsaRow = typeof PsaRow.Type;
 
 /**
  * The version a file's header declares, if it gives one, and its rows in order.
  */
 export const PsaRows = S.Struct({
-  declaredVersion: S.OptionFromSelf(S.String),
+  declaredVersion: S.Option(S.String),
   rows: S.Array(PsaRow),
-}).annotations({ identifier: 'PsaRows' });
+}).annotate({ identifier: 'PsaRows' });
 export type PsaRows = typeof PsaRows.Type;
 
 /**
@@ -92,50 +99,44 @@ export const PsaRecordFromPsaRowFor = <
   const tag: S.tag<Tag> = record.fields._tag;
   const names = columnNamesOfPsaRecord(record);
 
-  // Declared, as `FromWorkSheetRowsFor` is: TypeScript cannot type cells placed
-  // by position into any record's columns, so each side is decoded instead.
-  return S.declare([S.Struct({ ...PsaRow.fields, _tag: tag }), record], {
-    decode: (rowSchema, recordSchema) => (input, options, ast) =>
-      pipe(
-        ParseResult.decodeUnknownEither(rowSchema, options)(input),
-        Either.filterOrLeft(
-          ({ cells }) => cells.length <= names.length,
-          ({ _tag, cells }) =>
-            new ParseResult.Type(
-              ast,
+  const row = S.Struct({ ...PsaRow.fields, _tag: tag });
+  return row.pipe(
+    S.decodeTo(record, {
+      decode: SchemaGetter.transformEffect((input, options) => {
+        if (input.cells.length > names.length) {
+          return Effect.fail(
+            new SchemaIssue.InvalidValue(
+              {
+                message: `a ${input._tag} row has ${input.cells.length} cells, more than the ${names.length} columns a ${input._tag} has`,
+              },
               input,
-              `a ${_tag} row has ${cells.length} cells, more than the ${names.length} columns a ${_tag} has`,
             ),
-        ),
-        Either.flatMap(({ _tag, cells, unknownRowsAfter }) =>
-          ParseResult.decodeUnknownEither(
-            recordSchema,
-            options,
-          )({
-            ...Record.fromEntries(
-              names.map((name, index) => [name, cells[index] ?? '']),
-            ),
-            _tag,
-            unknownRowsAfter,
-          }),
-        ),
-      ),
-    encode: (rowSchema, recordSchema) => (input, options) =>
-      pipe(
-        ParseResult.encodeUnknownEither(recordSchema, options)(input),
-        Either.flatMap((encoded) => {
-          const textByName: Record.ReadonlyRecord<string, unknown> = encoded;
-          return ParseResult.decodeUnknownEither(
-            rowSchema,
-            options,
-          )({
-            _tag: textByName._tag,
-            cells: names.map((name) => textByName[name]),
-            unknownRowsAfter: textByName.unknownRowsAfter,
-          });
-        }),
-      ),
-  });
+          );
+        }
+        return SchemaParser.decodeUnknownEffect(
+          S.toEncoded(record),
+          options,
+        )({
+          ...Record.fromEntries(
+            names.map((name, index) => [name, input.cells[index] ?? '']),
+          ),
+          _tag: input._tag,
+          unknownRowsAfter: input.unknownRowsAfter,
+        });
+      }),
+      encode: SchemaGetter.transformEffect((encoded, options) => {
+        const textByName: Record.ReadonlyRecord<string, unknown> = encoded;
+        return SchemaParser.decodeUnknownEffect(
+          row,
+          options,
+        )({
+          _tag: textByName._tag,
+          cells: names.map((name) => textByName[name]),
+          unknownRowsAfter: textByName.unknownRowsAfter,
+        });
+      }),
+    }),
+  );
 };
 
 /** A record's columns, in the order a row holds their cells. */

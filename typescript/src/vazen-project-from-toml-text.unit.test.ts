@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { Either, Option, ParseResult, Schema as S } from 'effect';
+import { Option, Result, Schema as S } from 'effect';
 import { describe, expect, it } from 'vitest';
 
 import type { VazenProject } from './vazen-project';
@@ -20,23 +20,23 @@ const example = (fileName: string) =>
 const LAYOUT = example('end-of-aisle-layout.vazen.toml');
 const SPEC = example('end-of-aisle-spec.vazen.toml');
 
-const decode = S.decodeEither(VazenProjectFromTomlText);
-const encode = S.encodeEither(VazenProjectFromTomlText);
+const decode = S.decodeResult(VazenProjectFromTomlText);
+const encode = S.encodeResult(VazenProjectFromTomlText);
 
 describe('VazenProjectFromTomlText', () => {
   it.each([LAYOUT, SPEC])(
     'should write a project it read so that it reads back the same',
     (text) => {
-      const project = Either.getOrThrow(decode(text));
+      const project = Result.getOrThrow(decode(text));
 
-      expect(decode(Either.getOrThrow(encode(project)))).toEqual(
-        Either.right(project),
+      expect(decode(Result.getOrThrow(encode(project)))).toEqual(
+        Result.succeed(project),
       );
     },
   );
 
   it('should gather the keys beside the standard fields into attributes', () => {
-    const [unit, tray] = Either.getOrThrow(decode(SPEC)).products;
+    const [unit, tray] = Result.getOrThrow(decode(SPEC)).products;
 
     expect([unit?.attributes, tray?.attributes]).toEqual([
       { _vazen__group: 'dishwasher-tablets-50', brand: 'Example Brand' },
@@ -48,8 +48,8 @@ describe('VazenProjectFromTomlText', () => {
     ]);
   });
 
-  it('should record the file it read as the source, and write its own version whatever the source', () => {
-    const project = Either.getOrThrow(decode(LAYOUT));
+  it('records the source, writes its own version and omits processing messages', () => {
+    const project = Result.getOrThrow(decode(LAYOUT));
 
     expect([project.stage, project.source]).toEqual([
       'layout',
@@ -59,16 +59,24 @@ describe('VazenProjectFromTomlText', () => {
       }),
     ]);
     expect(
-      Either.getOrThrow(
+      Result.getOrThrow(
         encode({
           ...project,
+          messages: [
+            {
+              _tag: 'UnreadCells',
+              column: 'width',
+              rows: [1],
+              type: 'Product',
+            },
+          ],
           source: Option.some({
             declaredVersion: Option.some('2024.4.0'),
             format: 'psa',
           }),
         }),
       ),
-    ).toContain('schema_version = "0.3.0"');
+    ).toBe(Result.getOrThrow(encode(project)));
   });
 
   it('should write a file in its own style back unchanged', () => {
@@ -93,7 +101,9 @@ high = 1
 deep = 3
 `;
 
-    expect(encode(Either.getOrThrow(decode(text)))).toEqual(Either.right(text));
+    expect(encode(Result.getOrThrow(decode(text)))).toEqual(
+      Result.succeed(text),
+    );
   });
 
   it('should read an image as a URL or a table, and write one with nothing but its URL as the URL alone', () => {
@@ -101,8 +111,8 @@ deep = 3
       'brand = "Example Brand"',
       'brand = "Example Brand"\nimages = { front = "https://example.org/front.png", back = { url = "https://example.org/back.png", crop = { x = 200 } } }',
     );
-    const project = Either.getOrThrow(decode(text));
-    const written = Either.getOrThrow(encode(project));
+    const project = Result.getOrThrow(decode(text));
+    const written = Result.getOrThrow(encode(project));
 
     expect(project.products[0]?.images).toEqual(
       Option.some({
@@ -121,7 +131,7 @@ deep = 3
       }),
     );
     expect(written).toContain('front = "https://example.org/front.png"');
-    expect(decode(written)).toEqual(Either.right(project));
+    expect(decode(written)).toEqual(Result.succeed(project));
   });
 
   // The specification's rules of a whole file, and its spatial rules, are
@@ -161,7 +171,7 @@ deep = 3
       LAYOUT.replace('width = 1250, height = 2000', 'width = 0, height = 2000'),
     ],
   ])('should read %s', (_, text) => {
-    expect(Either.isRight(decode(text))).toBe(true);
+    expect(Result.isSuccess(decode(text))).toBe(true);
   });
 
   it('should name the version of a file it cannot read', () => {
@@ -169,13 +179,15 @@ deep = 3
       LAYOUT.replace('schema_version = "0.3.0"', 'schema_version = "0.2.0"'),
     );
 
-    expect(Either.isLeft(decoded) && decoded.left.message).toContain('"0.2.0"');
+    expect(Result.isFailure(decoded) && decoded.failure.message).toContain(
+      '"0.2.0"',
+    );
   });
 
   it('should read a file for a caller refusing excess properties', () => {
     expect(
-      Either.isRight(
-        S.decodeEither(VazenProjectFromTomlText)(LAYOUT, {
+      Result.isSuccess(
+        S.decodeResult(VazenProjectFromTomlText)(LAYOUT, {
           onExcessProperty: 'error',
         }),
       ),
@@ -216,7 +228,7 @@ deep = 3
       ),
     ],
   ])('should refuse %s', (_, text) => {
-    expect(Either.isLeft(decode(text))).toBe(true);
+    expect(Result.isFailure(decode(text))).toBe(true);
   });
 
   it.each([
@@ -257,9 +269,9 @@ deep = 3
       }),
     ],
   ])('should refuse to write %s, which would overwrite it', (_, change) => {
-    expect(Either.isLeft(encode(change(Either.getOrThrow(decode(SPEC)))))).toBe(
-      true,
-    );
+    expect(
+      Result.isFailure(encode(change(Result.getOrThrow(decode(SPEC))))),
+    ).toBe(true);
   });
 
   // Built without TypeScript's checks, as a JavaScript caller might.
@@ -282,9 +294,9 @@ deep = 3
     'should refuse to write a project built with %s, rather than dropping it',
     (_, build) => {
       expect(
-        Either.isLeft(
-          S.encodeUnknownEither(VazenProjectFromTomlText)(
-            build(Either.getOrThrow(decode(SPEC))),
+        Result.isFailure(
+          S.encodeUnknownResult(VazenProjectFromTomlText)(
+            build(Result.getOrThrow(decode(SPEC))),
           ),
         ),
       ).toBe(true);
@@ -294,25 +306,30 @@ deep = 3
 
 describe('decodeVazenProjectFromTomlFile and encodeTomlFileFromVazenProject', () => {
   it('reads a file as its tables, with the file it came from beside them, and writes them as the schema writes the project', () => {
-    const { project, source } = decodeVazenProjectFromTomlFile(LAYOUT);
+    const { messages, project, source } =
+      decodeVazenProjectFromTomlFile(LAYOUT);
 
-    expect(source).toEqual({ declaredVersion: '0.3.0', format: 'vazen-toml' });
+    expect(messages).toEqual([]);
+    expect(source).toEqual({
+      declaredVersion: '0.3.0',
+      format: 'vazen-toml',
+    });
     expect(
       project.fixtures?.[0]?.equipment?.[0]?.equipment?.[0]?.sites?.[0]?.facings
         ?.wide,
     ).toBe(2);
     expect(encodeTomlFileFromVazenProject({ project })).toBe(
-      Either.getOrThrow(encode(Either.getOrThrow(decode(LAYOUT)))),
+      Result.getOrThrow(encode(Result.getOrThrow(decode(LAYOUT)))),
     );
   });
 
-  it('throws a ParseError writing tables that reading would refuse', () => {
+  it('throws a SchemaError writing tables that reading would refuse', () => {
     const { project } = decodeVazenProjectFromTomlFile(SPEC);
 
     expect(() =>
       encodeTomlFileFromVazenProject({
         project: { ...project, brand: { name: 'Example Brand' } },
       }),
-    ).toThrow(ParseResult.ParseError);
+    ).toThrow(S.SchemaError);
   });
 });

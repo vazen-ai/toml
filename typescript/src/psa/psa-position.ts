@@ -372,11 +372,20 @@ export const PsaPosition = S.TaggedStruct('Position', {
   y_cap_with_units: FlagFromPsaCell,
   z_cap_with_units: FlagFromPsaCell,
   unknownRowsAfter: S.Array(PsaUnknownRow),
-}).annotations({ identifier: 'PsaPosition' });
+}).annotate({ identifier: 'PsaPosition' });
 export type PsaPosition = typeof PsaPosition.Type;
 
 export const PsaPositionFromPsaRow = PsaRecordFromPsaRowFor(
   PsaPosition,
-).annotations({
+).annotate({
   identifier: 'PsaPositionFromPsaRow',
+});
+
+/** A record with every column empty, which a new row is spread from. */
+export const PSA_EMPTY_POSITION: PsaPosition = S.decodeSync(
+  PsaPositionFromPsaRow,
+)({
+  _tag: 'Position',
+  cells: [],
+  unknownRowsAfter: [],
 });

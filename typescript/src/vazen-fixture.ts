@@ -1,6 +1,6 @@
 import { Schema as S } from 'effect';
 
-import { VAZEN_KNOWN_KEYS_ONLY, VazenAttributes } from './vazen-attributes';
+import { knownKeysOnly, VazenAttributes } from './vazen-attributes';
 import { VazenEquipment } from './vazen-equipment';
 import { VazenDimensions } from './vazen-geometry';
 
@@ -11,11 +11,13 @@ import { VazenDimensions } from './vazen-geometry';
  */
 export const VazenFixture = S.Struct({
   attributes: VazenAttributes,
-  dimensions: S.OptionFromSelf(VazenDimensions),
+  dimensions: S.Option(VazenDimensions),
   equipment: S.Array(VazenEquipment),
-  id: S.OptionFromSelf(S.String),
-  name: S.OptionFromSelf(S.String),
-  sortOrder: S.OptionFromSelf(S.Finite),
-}).annotations({ identifier: 'VazenFixture', ...VAZEN_KNOWN_KEYS_ONLY });
+  id: S.Option(S.String),
+  name: S.Option(S.String),
+  sortOrder: S.Option(S.Finite),
+})
+  .pipe(knownKeysOnly)
+  .annotate({ identifier: 'VazenFixture' });
 
 export type VazenFixture = typeof VazenFixture.Type;

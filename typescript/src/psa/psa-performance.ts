@@ -376,11 +376,20 @@ export const PsaPerformance = S.TaggedStruct('Performance', {
   recommended_target_inventory: TextFromPsaCell,
   recommended_minimum_inventory: TextFromPsaCell,
   unknownRowsAfter: S.Array(PsaUnknownRow),
-}).annotations({ identifier: 'PsaPerformance' });
+}).annotate({ identifier: 'PsaPerformance' });
 export type PsaPerformance = typeof PsaPerformance.Type;
 
 export const PsaPerformanceFromPsaRow = PsaRecordFromPsaRowFor(
   PsaPerformance,
-).annotations({
+).annotate({
   identifier: 'PsaPerformanceFromPsaRow',
+});
+
+/** A record with every column empty, which a new row is spread from. */
+export const PSA_EMPTY_PERFORMANCE: PsaPerformance = S.decodeSync(
+  PsaPerformanceFromPsaRow,
+)({
+  _tag: 'Performance',
+  cells: [],
+  unknownRowsAfter: [],
 });
