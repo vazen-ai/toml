@@ -1,6 +1,6 @@
 {
   "name": "@vazen-ai/toml",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Read and write Vazen TOML 0.3.0 files, as TOML or JSON, and ProSpace PSA planogram files.",
   "keywords": [
     "blue-yonder",
