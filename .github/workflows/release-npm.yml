@@ -51,8 +51,10 @@ jobs:
         if: steps.release.outputs.version
         run: |
           npm pkg set "gitHead=$GITHUB_SHA"
-          npm pack --json > pack.json
-          mv -- "$(jq -er '.[0].filename' pack.json)" package.tgz
+          # The prepack build shares npm pack's output, so take the tarball from an empty folder
+          mkdir "$RUNNER_TEMP/package"
+          npm pack --pack-destination "$RUNNER_TEMP/package"
+          mv -- "$RUNNER_TEMP"/package/*.tgz package.tgz
           echo "sha256=$(sha256sum package.tgz | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
       - name: Import the packed package as a consumer
         if: steps.release.outputs.version

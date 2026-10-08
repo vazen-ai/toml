@@ -3,7 +3,17 @@
 Changes to the `@vazen-ai/toml` npm package. Package versions are independent of
 the Vazen TOML file format's `schema_version`.
 
+<!-- Each version repeats the Added, Changed and Fixed headings. -->
+<!-- markdownlint-configure-file { "MD024": { "siblings_only": true } } -->
+
 ## [Unreleased]
+
+## [0.2.1] - 2026-10-08
+
+### Fixed
+
+- Fix the npm release workflow, which stopped before publishing 0.2.0. The
+  package code is unchanged from 0.2.0.
 
 ## [0.2.0] - 2026-10-06
 
