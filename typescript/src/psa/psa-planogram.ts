@@ -618,11 +618,20 @@ export const PsaPlanogram = S.TaggedStruct('Planogram', {
   activity_id: TextFromPsaCell,
   optimization_status: TextFromPsaCell,
   unknownRowsAfter: S.Array(PsaUnknownRow),
-}).annotations({ identifier: 'PsaPlanogram' });
+}).annotate({ identifier: 'PsaPlanogram' });
 export type PsaPlanogram = typeof PsaPlanogram.Type;
 
 export const PsaPlanogramFromPsaRow = PsaRecordFromPsaRowFor(
   PsaPlanogram,
-).annotations({
+).annotate({
   identifier: 'PsaPlanogramFromPsaRow',
+});
+
+/** A record with every column empty, which a new row is spread from. */
+export const PSA_EMPTY_PLANOGRAM: PsaPlanogram = S.decodeSync(
+  PsaPlanogramFromPsaRow,
+)({
+  _tag: 'Planogram',
+  cells: [],
+  unknownRowsAfter: [],
 });

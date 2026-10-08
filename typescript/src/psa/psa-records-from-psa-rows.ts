@@ -1,17 +1,20 @@
 import {
   Array as A,
-  Either,
+  Effect,
   Match,
   Option,
-  ParseResult,
   pipe,
   Record,
+  Result,
   Schema as S,
+  SchemaGetter,
+  SchemaIssue,
+  SchemaParser,
   String as Str,
 } from 'effect';
 
-import type { PsaCompromise } from './psa-compromises';
 import { PsaFixture, PsaFixtureFromPsaRow } from './psa-fixture';
+import type { PsaMessage } from './psa-messages';
 import { PsaPerformance, PsaPerformanceFromPsaRow } from './psa-performance';
 import { PsaPlanogram, PsaPlanogramFromPsaRow } from './psa-planogram';
 import { PsaPosition, PsaPositionFromPsaRow } from './psa-position';
@@ -28,22 +31,22 @@ import {
 
 // Each row is read, and each record written, by its type's row schema.
 const RECORD_FROM_ROW = {
-  Fixture: ParseResult.decodeUnknownEither(PsaFixtureFromPsaRow),
-  Performance: ParseResult.decodeUnknownEither(PsaPerformanceFromPsaRow),
-  Planogram: ParseResult.decodeUnknownEither(PsaPlanogramFromPsaRow),
-  Position: ParseResult.decodeUnknownEither(PsaPositionFromPsaRow),
-  Product: ParseResult.decodeUnknownEither(PsaProductFromPsaRow),
-  Project: ParseResult.decodeUnknownEither(PsaProjectFromPsaRow),
-  Segment: ParseResult.decodeUnknownEither(PsaSegmentFromPsaRow),
+  Fixture: SchemaParser.decodeUnknownResult(PsaFixtureFromPsaRow),
+  Performance: SchemaParser.decodeUnknownResult(PsaPerformanceFromPsaRow),
+  Planogram: SchemaParser.decodeUnknownResult(PsaPlanogramFromPsaRow),
+  Position: SchemaParser.decodeUnknownResult(PsaPositionFromPsaRow),
+  Product: SchemaParser.decodeUnknownResult(PsaProductFromPsaRow),
+  Project: SchemaParser.decodeUnknownResult(PsaProjectFromPsaRow),
+  Segment: SchemaParser.decodeUnknownResult(PsaSegmentFromPsaRow),
 };
 const ROW_FROM_RECORD = {
-  Fixture: ParseResult.encodeEither(PsaFixtureFromPsaRow),
-  Performance: ParseResult.encodeEither(PsaPerformanceFromPsaRow),
-  Planogram: ParseResult.encodeEither(PsaPlanogramFromPsaRow),
-  Position: ParseResult.encodeEither(PsaPositionFromPsaRow),
-  Product: ParseResult.encodeEither(PsaProductFromPsaRow),
-  Project: ParseResult.encodeEither(PsaProjectFromPsaRow),
-  Segment: ParseResult.encodeEither(PsaSegmentFromPsaRow),
+  Fixture: SchemaParser.encodeResult(PsaFixtureFromPsaRow),
+  Performance: SchemaParser.encodeResult(PsaPerformanceFromPsaRow),
+  Planogram: SchemaParser.encodeResult(PsaPlanogramFromPsaRow),
+  Position: SchemaParser.encodeResult(PsaPositionFromPsaRow),
+  Product: SchemaParser.encodeResult(PsaProductFromPsaRow),
+  Project: SchemaParser.encodeResult(PsaProjectFromPsaRow),
+  Segment: SchemaParser.encodeResult(PsaSegmentFromPsaRow),
 };
 const COLUMN_NAMES = {
   Fixture: columnNamesOfPsaRecord(PsaFixture),
@@ -66,102 +69,112 @@ const LISTED_WIDTHS = Record.map(
  * Reads a file's records from its rows, each by its type's columns, and keeps
  * the version the file declares as `declaredVersion`. A cell past a row's last
  * column is dropped, and a cell its column cannot read is read as empty; both
- * are listed in `compromises`, as are rows of a width no listed version gives.
+ * are listed in `messages`, as are rows of a width no listed version gives.
  * Writes the records as the version `declaredVersion` holds, 2024.4.0 when it
  * holds none or one `PsaVersion` does not list, with that version's header and
  * row widths, and refuses a value in a column the version does not have.
  */
-export const PsaRecordsFromPsaRows: S.Schema<PsaRecords, PsaRows> =
-  S.transformOrFail(PsaRows, PsaRecords, {
-    decode: ({ declaredVersion, rows }) =>
-      pipe(
-        rows.map(readRow),
-        Either.all,
-        Either.map((read) => {
-          const [, ordinals] = A.mapAccum(
-            rows,
-            Record.empty<string, number>(),
-            (counts, { _tag }) => {
-              const ordinal = (counts[_tag] ?? 0) + 1;
-              return [{ ...counts, [_tag]: ordinal }, ordinal];
-            },
-          );
-          const facts = read.map((fact, index) => ({
-            ...fact,
-            ordinal: ordinals[index] ?? 0,
-          }));
-          const compromises: ReadonlyArray<PsaCompromise> = [
-            ...groupRows({
-              key: ({ type, width }) => `${type} ${width}`,
-              rows: facts.filter(
-                ({ type, width }) => !LISTED_WIDTHS[type].includes(width),
-              ),
-            }).map(({ first: { type, width }, rows }) => ({
-              _tag: 'UnlistedWidth' as const,
+export const PsaRecordsFromPsaRows: S.Codec<PsaRecords, PsaRows> = PsaRows.pipe(
+  S.decodeTo(PsaRecords, {
+    decode: SchemaGetter.transformEffect(({ declaredVersion, rows }) =>
+      Effect.fromResult(
+        pipe(
+          rows.map(readRow),
+          Result.all,
+          Result.map((read) => {
+            const [, ordinals] = A.mapAccum(
               rows,
-              type,
-              width,
-            })),
-            ...groupRows({
-              key: ({ type }) => type,
-              rows: facts.filter(({ dropped }) => dropped),
-            }).map(({ first: { type }, rows }) => ({
-              _tag: 'DroppedCells' as const,
-              rows,
-              type,
-            })),
-            ...groupRows({
-              key: ({ column, type }) => `${type} ${column}`,
-              rows: facts.flatMap((fact) =>
-                fact.unread.map((column) => ({ ...fact, column })),
-              ),
-            }).map(({ first: { column, type }, rows }) => ({
-              _tag: 'UnreadCells' as const,
-              column,
-              rows,
-              type,
-            })),
-          ];
-          return {
-            compromises,
-            declaredVersion,
-            records: facts.map(({ record }) => record),
-          };
-        }),
+              Record.empty<string, number>(),
+              (counts, { _tag }) => {
+                const ordinal = (counts[_tag] ?? 0) + 1;
+                return [{ ...counts, [_tag]: ordinal }, ordinal];
+              },
+            );
+            const facts = read.map((fact, index) => ({
+              ...fact,
+              ordinal: ordinals[index] ?? 0,
+            }));
+            const messages: ReadonlyArray<PsaMessage> = [
+              ...groupRows({
+                key: ({ type, width }) => `${type} ${width}`,
+                rows: facts.filter(
+                  ({ type, width }) => !LISTED_WIDTHS[type].includes(width),
+                ),
+              }).map(({ first: { type, width }, rows }) => ({
+                _tag: 'UnlistedWidth' as const,
+                rows,
+                type,
+                width,
+              })),
+              ...groupRows({
+                key: ({ type }) => type,
+                rows: facts.filter(({ dropped }) => dropped),
+              }).map(({ first: { type }, rows }) => ({
+                _tag: 'DroppedCells' as const,
+                rows,
+                type,
+              })),
+              ...groupRows({
+                key: ({ column, type }) => `${type} ${column}`,
+                rows: facts.flatMap((fact) =>
+                  fact.unread.map((column) => ({ ...fact, column })),
+                ),
+              }).map(({ first: { column, type }, rows }) => ({
+                _tag: 'UnreadCells' as const,
+                column,
+                rows,
+                type,
+              })),
+            ];
+            return {
+              declaredVersion,
+              messages,
+              records: facts.map(({ record }) => record),
+            };
+          }),
+        ),
       ),
-    encode: ({ declaredVersion, records }, _, ast) => {
+    ),
+    encode: SchemaGetter.transformEffect(({ declaredVersion, records }, _) => {
       const version = pipe(
         declaredVersion,
         Option.flatMap(S.decodeUnknownOption(PsaVersion)),
         Option.getOrElse(() => PSA_DEFAULT_WRITTEN_VERSION),
       );
-      return pipe(
-        records.map((record, index) =>
-          Either.gen(function* () {
-            const row = yield* Match.valueTags(record, ROW_FROM_RECORD);
-            const columnCount = PSA_VERSION_COLUMN_COUNTS[version][record._tag];
-            const extra = A.findFirstIndex(
-              row.cells.slice(columnCount),
-              (cell) => cell !== '',
-            );
-            if (Option.isSome(extra)) {
-              return yield* Either.left(
-                new ParseResult.Type(
-                  ast,
-                  record,
-                  `${record._tag} row ${ordinalOf({ index, items: records })} holds a value in column ${columnCount + extra.value + 1}, which a ${version} file's ${record._tag} rows do not have`,
-                ),
+      return Effect.fromResult(
+        pipe(
+          records.map((record, index) =>
+            Result.gen(function* () {
+              const row = yield* Match.valueTags(record, ROW_FROM_RECORD);
+              const columnCount =
+                PSA_VERSION_COLUMN_COUNTS[version][record._tag];
+              const extra = A.findFirstIndex(
+                row.cells.slice(columnCount),
+                (cell) => cell !== '',
               );
-            }
-            return { ...row, cells: row.cells.slice(0, columnCount) };
-          }),
+              if (Option.isSome(extra)) {
+                return yield* Result.fail(
+                  new SchemaIssue.InvalidValue(
+                    {
+                      message: `${record._tag} row ${ordinalOf({ index, items: records })} holds a value in column ${columnCount + extra.value + 1}, which a ${version} file's ${record._tag} rows do not have`,
+                    },
+                    record,
+                  ),
+                );
+              }
+              return { ...row, cells: row.cells.slice(0, columnCount) };
+            }),
+          ),
+          Result.all,
+          Result.map((rows) => ({
+            declaredVersion: Option.some(version),
+            rows,
+          })),
         ),
-        Either.all,
-        Either.map((rows) => ({ declaredVersion: Option.some(version), rows })),
       );
-    },
-    strict: true,
-  }).annotations({ identifier: 'PsaRecordsFromPsaRows' });
+    }),
+  }),
+).annotate({ identifier: 'PsaRecordsFromPsaRows' });
 
 /**
  * Whether every value the records hold sits in a column a `version` file's
@@ -191,7 +204,7 @@ export const psaVersionHolds = ({
 // Reads a row, dropping the cells past its type's last column.
 const readRow = (row: PsaRow) => {
   const columnCount = COLUMN_NAMES[row._tag].length;
-  return Either.map(
+  return Result.map(
     readCells(
       row.cells.length > columnCount
         ? { ...row, cells: row.cells.slice(0, columnCount) }
@@ -212,20 +225,26 @@ const readRow = (row: PsaRow) => {
 const readCells = (row: PsaRow) =>
   pipe(
     Match.valueTags(row, RECORD_FROM_ROW),
-    Either.map((record) => ({ record, unread: A.empty<string>() })),
-    Either.orElse(() => {
+    Result.map((record) => ({ record, unread: A.empty<string>() })),
+    Result.orElse(() => {
       const names = COLUMN_NAMES[row._tag];
-      const everyIssue: Either.Either<PsaRecord, ParseResult.ParseIssue> =
+      const everyIssue: Result.Result<PsaRecord, SchemaIssue.Issue> =
         RECORD_FROM_ROW[row._tag](row, { errors: 'all' });
       const failing = new Set(
         pipe(
-          Either.getLeft(everyIssue),
-          Option.map(ParseResult.ArrayFormatter.formatIssueSync),
+          Result.getFailure(everyIssue),
+          Option.map(
+            (issue) =>
+              SchemaIssue.makeFormatterStandardSchemaV1()(issue).issues,
+          ),
           Option.getOrElse(() => []),
-          A.map(({ path: [column] }) => column),
+          A.map(({ path }) => {
+            const first = path?.[0];
+            return typeof first === 'object' ? first.key : first;
+          }),
         ),
       );
-      return Either.map(
+      return Result.map(
         Match.valueTags(
           {
             ...row,

@@ -1,9 +1,12 @@
 import {
-  Either,
+  Effect,
   Option,
-  ParseResult,
   pipe,
+  Result,
   Schema as S,
+  SchemaGetter,
+  SchemaIssue,
+  SchemaParser,
   String as Str,
 } from 'effect';
 
@@ -15,11 +18,13 @@ const INHERITED_CELL = '-1';
 // A whole number a column's code list does not have, such as a code a later
 // ProSpace added, is kept; any other text in a code column is not a code.
 const UNLISTED_CODE = /^-?\d+$/;
+// Files write a code as `0.00` as often as `0`.
+const ZERO_FRACTION = /^(-?\d+)\.0+$/;
 
 /** A code its column's list does not have, kept as the file writes it. */
 export const PsaUnlistedCode = S.TaggedStruct('UnlistedCode', {
   code: S.String,
-}).annotations({ identifier: 'PsaUnlistedCode' });
+}).annotate({ identifier: 'PsaUnlistedCode' });
 export type PsaUnlistedCode = typeof PsaUnlistedCode.Type;
 
 // An empty cell is absent, not the column's default: a reader that wants an
@@ -30,103 +35,134 @@ const OptionFromCell = <A, I extends string>({
   value,
 }: Readonly<{
   isEmpty: (text: string) => boolean;
-  value: S.Schema<A, I>;
+  value: S.Codec<A, I>;
 }>) =>
-  S.transformOrFail(S.String, S.OptionFromSelf(S.typeSchema(value)), {
-    decode: (text, options) =>
-      isEmpty(text)
-        ? ParseResult.succeed(Option.none())
-        : Either.map(
-            ParseResult.decodeUnknownEither(value, options)(text),
-            Option.some,
-          ),
-    encode: (option, options) =>
-      Option.match(option, {
-        onNone: () => ParseResult.succeed(''),
-        onSome: ParseResult.encodeEither(value, options),
-      }),
-    strict: true,
-  });
+  S.String.pipe(
+    S.decodeTo(S.Option(S.toType(value)), {
+      decode: SchemaGetter.transformEffect((text, options) =>
+        isEmpty(text)
+          ? Effect.succeed(Option.none())
+          : Effect.fromResult(
+              Result.map(
+                SchemaParser.decodeUnknownResult(value, options)(text),
+                Option.some,
+              ),
+            ),
+      ),
+      encode: SchemaGetter.transformEffect((option, options) =>
+        Option.match(option, {
+          onNone: () => Effect.succeed(''),
+          onSome: SchemaParser.encodeEffect(value, options),
+        }),
+      ),
+    }),
+  );
 
 const OptionalFromPsaCell = <A, I extends string>(
-  value: S.Schema<A, I>,
-): S.Schema<Option.Option<A>, string> =>
-  OptionFromCell({ isEmpty: Str.isEmpty, value }).annotations({
+  value: S.Codec<A, I>,
+): S.Codec<Option.Option<A>, string> =>
+  OptionFromCell({ isEmpty: Str.isEmpty, value }).annotate({
     identifier: 'PsaCell',
   });
 
-const UnlistedCodeFromText = S.transform(
-  S.String.pipe(S.pattern(UNLISTED_CODE)),
-  PsaUnlistedCode,
-  {
-    decode: (code) => ({ _tag: 'UnlistedCode' as const, code }),
-    encode: ({ code }) => code,
-    strict: true,
-  },
+const UnlistedCodeFromText = S.String.pipe(
+  S.check(S.isPattern(UNLISTED_CODE)),
+).pipe(
+  S.decodeTo(PsaUnlistedCode, {
+    decode: SchemaGetter.transform((code) => ({
+      _tag: 'UnlistedCode' as const,
+      code,
+    })),
+    encode: SchemaGetter.transform(({ code }) => code),
+  }),
+);
+
+// A code spelt with a zero fraction is read as the whole number it is, and
+// written back as that. The text is left alone otherwise, so a fraction that
+// is not zero still fails as not a code.
+const WholeNumberFromZeroFraction = S.String.pipe(
+  S.decodeTo(S.String, {
+    decode: SchemaGetter.transform((text) => text.replace(ZERO_FRACTION, '$1')),
+    encode: SchemaGetter.transform((text) => text),
+  }),
 );
 
 // Real files contain `-0`; it reads as `0` so a value written back compares
 // equal to the one read. `Number` reads a cell of only spaces as `0`, so that
 // is refused.
-const NumberFromText = S.transformOrFail(S.String, S.Finite, {
-  decode: (text, _, ast) =>
-    pipe(Number(text), (value) =>
-      Str.isNonEmpty(Str.trim(text)) && Number.isFinite(value)
-        ? ParseResult.succeed(value === 0 ? 0 : value)
-        : ParseResult.fail(
-            new ParseResult.Type(ast, text, `"${text}" is not a number`),
-          ),
+const NumberFromText = S.String.pipe(
+  S.decodeTo(S.Finite, {
+    decode: SchemaGetter.transformEffect((text, _) =>
+      pipe(Number(text), (value) =>
+        Str.isNonEmpty(Str.trim(text)) && Number.isFinite(value)
+          ? Effect.succeed(value === 0 ? 0 : value)
+          : Effect.fail(
+              new SchemaIssue.InvalidValue(
+                { message: `"${text}" is not a number` },
+                text,
+              ),
+            ),
+      ),
     ),
-  encode: (value) => ParseResult.succeed(String(value)),
-  strict: true,
-});
+    encode: SchemaGetter.transformEffect((value) =>
+      Effect.succeed(String(value)),
+    ),
+  }),
+);
 
 // Every real file writes booleans as `0` and `1`; ProSpace's field definitions
 // name them `Yes` and `No`, so those are read as well.
-const FlagFromText = S.transform(S.Literal('0', '1', 'No', 'Yes'), S.Boolean, {
-  decode: (text) => text === '1' || text === 'Yes',
-  encode: (value) => (value ? '1' : '0'),
-  strict: true,
-});
+const FlagFromText = S.Literals(['0', '1', 'No', 'Yes']).pipe(
+  S.decodeTo(S.Boolean, {
+    decode: SchemaGetter.transform((text) => text === '1' || text === 'Yes'),
+    encode: SchemaGetter.transform((value) => (value ? '1' : '0')),
+  }),
+);
 
 export const TextFromPsaCell = OptionalFromPsaCell(
   S.String.pipe(
     // Empty text would be written as an empty cell, which reads as absent.
-    S.filter(
-      (text) =>
-        Str.isNonEmpty(text) ||
-        'empty text is read as an empty cell, so it cannot be kept as text',
+    S.check(
+      S.makeFilter(
+        (text) =>
+          Str.isNonEmpty(text) ||
+          'empty text is read as an empty cell, so it cannot be kept as text',
+      ),
     ),
   ),
-).annotations({ identifier: 'PsaTextCell' });
+).annotate({ identifier: 'PsaTextCell' });
 
-export const NumberFromPsaCell = OptionalFromPsaCell(
-  NumberFromText,
-).annotations({
+export const NumberFromPsaCell = OptionalFromPsaCell(NumberFromText).annotate({
   identifier: 'PsaNumberCell',
 });
 
 /**
  * A cell holding one of a code list's codes, or a code the list does not have.
  */
-export const CodeFromPsaCell = <A, I extends string>(list: S.Schema<A, I>) => {
-  const isListed = S.is(S.encodedSchema(list));
+export const CodeFromPsaCell = <A, I extends string>(list: S.Codec<A, I>) => {
+  const isListed = S.is(S.toEncoded(list));
   return OptionalFromPsaCell(
-    S.Union(
-      list,
-      // A listed code would be read back as the list's value.
-      UnlistedCodeFromText.pipe(
-        S.filter(
-          ({ code }) =>
-            !isListed(code) ||
-            `${code} is one of its column's codes, so it cannot be kept as an unlisted one`,
-        ),
+    WholeNumberFromZeroFraction.pipe(
+      S.decodeTo(
+        S.Union([
+          list,
+          // A listed code would be read back as the list's value.
+          UnlistedCodeFromText.pipe(
+            S.check(
+              S.makeFilter(
+                ({ code }) =>
+                  !isListed(code) ||
+                  `${code} is one of its column's codes, so it cannot be kept as an unlisted one`,
+              ),
+            ),
+          ),
+        ]),
       ),
     ),
-  ).annotations({ identifier: 'PsaCodeCell' });
+  ).annotate({ identifier: 'PsaCodeCell' });
 };
 
 export const FlagFromPsaCell = OptionFromCell({
   isEmpty: (text) => Str.isEmpty(text) || text === INHERITED_CELL,
   value: FlagFromText,
-}).annotations({ identifier: 'PsaFlagCell' });
+}).annotate({ identifier: 'PsaFlagCell' });

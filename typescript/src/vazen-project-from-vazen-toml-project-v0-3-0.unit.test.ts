@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { Either, Option, Schema as S } from 'effect';
+import { Option, Result, Schema as S } from 'effect';
 import { describe, expect, it } from 'vitest';
 
 import type { VazenProject } from './vazen-project';
 import { VazenProjectFromTomlText } from './vazen-project-from-toml-text';
+import { VazenProjectFromVazenTomlProjectV0_3_0 } from './vazen-project-from-vazen-toml-project-v0-3-0';
 
 // Hand-written, as the record of what 0.3.0 writes: the package must write it
 // byte for byte and read it back, so a change to what 0.3.0 writes fails here
@@ -108,6 +109,7 @@ const EVERY_FIELD: VazenProject = {
       sortOrder: Option.some(1),
     },
   ],
+  messages: [],
   name: Option.some('Every Field'),
   products: [
     {
@@ -164,17 +166,28 @@ const EVERY_FIELD: VazenProject = {
 
 // Written and read as text, since the example is a file: these tables under
 // `TomlFromText`.
-const decode = S.decodeEither(VazenProjectFromTomlText);
-const encode = S.encodeEither(VazenProjectFromTomlText);
+const decode = S.decodeResult(VazenProjectFromTomlText);
+const encode = S.encodeResult(VazenProjectFromTomlText);
 
 describe('VazenProjectFromVazenTomlProjectV0_3_0', () => {
+  it('refuses an own `__proto__` key when encoding through the schema directly', () => {
+    expect(() =>
+      S.encodeSync(VazenProjectFromVazenTomlProjectV0_3_0)({
+        ...EVERY_FIELD,
+        attributes: JSON.parse(
+          '{"_example_org__data":[{"__proto__":"Dummy"}]}',
+        ),
+      }),
+    ).toThrow('["__proto__"]');
+  });
+
   it('should write the project holding every field as the every-field example, byte for byte', () => {
-    expect(encode(EVERY_FIELD)).toEqual(Either.right(EVERY_FIELD_LAYOUT));
+    expect(encode(EVERY_FIELD)).toEqual(Result.succeed(EVERY_FIELD_LAYOUT));
   });
 
   it('should read the every-field example back as that project', () => {
     expect(decode(EVERY_FIELD_LAYOUT)).toEqual(
-      Either.right({
+      Result.succeed({
         ...EVERY_FIELD,
         source: Option.some({
           declaredVersion: Option.some('0.3.0'),

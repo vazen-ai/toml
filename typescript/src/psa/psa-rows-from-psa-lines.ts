@@ -1,10 +1,12 @@
 import {
   Array as A,
+  Effect,
   Option,
-  ParseResult,
   pipe,
   Record,
   Schema as S,
+  SchemaGetter,
+  SchemaIssue,
   String as Str,
 } from 'effect';
 
@@ -47,57 +49,61 @@ const ESCAPED_CHARACTERS = /[\t\n\r",\\]/g;
  * does not read is kept with the row before it, so it is written back there.
  * Comment lines other than the header's, and blank lines, are dropped.
  */
-export const PsaRowsFromPsaLines = S.transformOrFail(PsaLines, PsaRows, {
-  decode: (lines, _, ast) => {
-    const fail = (message: string) =>
-      ParseResult.fail(new ParseResult.Type(ast, lines.slice(0, 3), message));
-    if (!FIRST_LINE_PATTERN.test(lines[0] ?? '')) {
-      return fail(`not a PSA file: the first line must be "${FIRST_LINE}"`);
-    }
-    const { groups, leading } = groupUnderHeads({
-      isHead: isKnownRow,
-      items: lines.slice(1).filter(isRow).map(splitCells),
-      toGroup: ([_tag, ...cells], unknownRows) => ({
-        _tag,
-        cells,
-        unknownRowsAfter: unknownRows.map(
-          ([unknownTag = '', ...unknownCells]) => ({
-            _tag: unknownTag,
-            cells: unknownCells,
-          }),
-        ),
-      }),
-    });
-    return Option.match(A.head(leading), {
-      onNone: () =>
-        ParseResult.succeed({
-          declaredVersion: pipe(
-            A.findFirst(lines, (line) =>
-              Option.fromNullable(VERSION_PATTERN.exec(line)?.[1]),
-            ),
-            Option.map(Str.trim),
-            Option.filter(Str.isNonEmpty),
+export const PsaRowsFromPsaLines = PsaLines.pipe(
+  S.decodeTo(PsaRows, {
+    decode: SchemaGetter.transformEffect((lines, _) => {
+      const fail = (message: string) =>
+        Effect.fail(
+          new SchemaIssue.InvalidValue({ message }, lines.slice(0, 3)),
+        );
+      if (!FIRST_LINE_PATTERN.test(lines[0] ?? '')) {
+        return fail(`not a PSA file: the first line must be "${FIRST_LINE}"`);
+      }
+      const { groups, leading } = groupUnderHeads({
+        isHead: isKnownRow,
+        items: lines.slice(1).filter(isRow).map(splitCells),
+        toGroup: ([_tag, ...cells], unknownRows) => ({
+          _tag,
+          cells,
+          unknownRowsAfter: unknownRows.map(
+            ([unknownTag = '', ...unknownCells]) => ({
+              _tag: unknownTag,
+              cells: unknownCells,
+            }),
           ),
-          rows: groups,
         }),
-      onSome: ([_tag = '']) => fail(`a ${_tag} row before the Project row`),
-    });
-  },
-  encode: ({ declaredVersion, rows }) =>
-    ParseResult.succeed([
-      FIRST_LINE,
-      ...Option.toArray(
-        Option.map(declaredVersion, (text) => `${VERSION_PREFIX}${text}`),
-      ),
-      CODEPAGE_LINE,
-      ...rows.flatMap((row) =>
-        [row, ...row.unknownRowsAfter].map(({ _tag, cells }) =>
-          joinCells([_tag, ...cells]),
+      });
+      return Option.match(A.head(leading), {
+        onNone: () =>
+          Effect.succeed({
+            declaredVersion: pipe(
+              A.findFirst(lines, (line) =>
+                Option.fromNullishOr(VERSION_PATTERN.exec(line)?.[1]),
+              ),
+              Option.map(Str.trim),
+              Option.filter(Str.isNonEmpty),
+            ),
+            rows: groups,
+          }),
+        onSome: ([_tag = '']) => fail(`a ${_tag} row before the Project row`),
+      });
+    }),
+    encode: SchemaGetter.transformEffect(({ declaredVersion, rows }) =>
+      Effect.succeed([
+        FIRST_LINE,
+        ...Option.toArray(
+          Option.map(declaredVersion, (text) => `${VERSION_PREFIX}${text}`),
         ),
-      ),
-    ]),
-  strict: true,
-}).annotations({ identifier: 'PsaRowsFromPsaLines' });
+        CODEPAGE_LINE,
+        ...rows.flatMap((row) =>
+          [row, ...row.unknownRowsAfter].map(({ _tag, cells }) =>
+            joinCells([_tag, ...cells]),
+          ),
+        ),
+      ]),
+    ),
+  }),
+).annotate({ identifier: 'PsaRowsFromPsaLines' });
 
 const isRecordType = S.is(PsaRecordType);
 
@@ -112,25 +118,27 @@ const isKnownRow = (
 // backslash escape. An escape ProSpace does not write keeps its backslash.
 const splitCells = (line: string): Array<string> => {
   const cells: Array<string> = [];
-  let cell = '';
-  let escaped = false;
-  for (const character of line) {
-    if (escaped) {
-      cell += Option.getOrElse(
-        Record.get(CHARACTER_BY_ESCAPE, character),
-        () => `\\${character}`,
-      );
-      escaped = false;
-    } else if (character === '\\') {
-      escaped = true;
-    } else if (character === ',') {
-      cells.push(cell);
-      cell = '';
+  const boundaries = /[,\\]/g;
+  let parts: Array<string> = [];
+  let start = 0;
+  for (let boundary; (boundary = boundaries.exec(line));) {
+    const index = boundary.index;
+    parts.push(line.slice(start, index));
+    if (boundary[0] === ',') {
+      cells.push(parts.join(''));
+      parts = [];
+      start = index + 1;
     } else {
-      cell += character;
+      parts.push(
+        CHARACTER_BY_ESCAPE[line[index + 1] ?? ''] ??
+          line.slice(index, index + 2),
+      );
+      start = Math.min(index + 2, line.length);
+      boundaries.lastIndex = start;
     }
   }
-  cells.push(escaped ? `${cell}\\` : cell);
+  parts.push(line.slice(start));
+  cells.push(parts.join(''));
   return cells;
 };
 

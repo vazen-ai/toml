@@ -1,7 +1,16 @@
-import { Either, Option, ParseResult, pipe, Record, Schema as S } from 'effect';
+import {
+  Effect,
+  Option,
+  pipe,
+  Record,
+  Result,
+  Schema as S,
+  SchemaGetter,
+  SchemaParser,
+} from 'effect';
 
 import type { VazenTomlProjectV0_3_0 } from './specification/vazen-toml-project-v0-3-0';
-import { VazenProject } from './vazen-project';
+import { VazenProject, VazenProjectSource } from './vazen-project';
 import { VazenProjectFromVazenTomlProjectV0_3_0 } from './vazen-project-from-vazen-toml-project-v0-3-0';
 
 // Each version's tables, by the `schema_version` a file declares.
@@ -9,29 +18,25 @@ const VAZEN_PROJECT_FROM_VAZEN_TOML_PROJECT_BY_VERSION = {
   '0.3.0': VazenProjectFromVazenTomlProjectV0_3_0,
 } as const;
 
-// The version written when no other is given.
-const DEFAULT_WRITTEN_VERSION = '0.3.0' satisfies VazenVersion;
+/** The version written when no other is given. */
+export const VAZEN_DEFAULT_WRITTEN_VERSION = '0.3.0' satisfies VazenVersion;
 
 /** A version of the specification a file can be read and written as. */
-export const VazenVersion = S.Literal(
-  ...Record.keys(VAZEN_PROJECT_FROM_VAZEN_TOML_PROJECT_BY_VERSION),
-).annotations({ identifier: 'VazenVersion' });
+export const VazenVersion = S.Literals(
+  Record.keys(VAZEN_PROJECT_FROM_VAZEN_TOML_PROJECT_BY_VERSION),
+).annotate({ identifier: 'VazenVersion' });
 
 export type VazenVersion = typeof VazenVersion.Type;
 
 /**
  * What a file function returns: the project as the tables of a 0.3.0 file,
  * whatever the file's format, and beside them the source, the file the project
- * came from. A writer does not write the source.
+ * came from, and any messages from reading. A writer writes only the project.
  */
 export type VazenProjectRead = Readonly<{
+  messages: VazenProject['messages'];
   project: VazenTomlProjectV0_3_0;
-  source: Readonly<{
-    /** The version the file declares, if it gives one. */
-    declaredVersion?: string;
-    /** The file's format, such as `'vazen-toml'`, `'vazen-json'` or `'psa'`. */
-    format: string;
-  }>;
+  source: typeof Source.Encoded;
 }>;
 
 /**
@@ -41,30 +46,44 @@ export type VazenProjectRead = Readonly<{
  * error names that version. Reading does not check the rules of a whole file,
  * such as a selector matching exactly one product, nor the spatial rules.
  */
-export const VazenProjectFromVazenTomlProject: S.Schema<VazenProject, unknown> =
-  S.transformOrFail(S.Unknown, VazenProject, {
-    decode: (tables, options) =>
-      pipe(
-        ParseResult.decodeUnknownEither(DeclaredVersion)(tables, options),
-        Either.flatMap(({ schema_version: declaredVersion }) =>
-          ParseResult.decodeUnknownEither(
-            VAZEN_PROJECT_FROM_VAZEN_TOML_PROJECT_BY_VERSION[declaredVersion],
-          )(tables, options),
+export const VazenProjectFromVazenTomlProject: S.Codec<VazenProject, unknown> =
+  S.Unknown.pipe(
+    S.decodeTo(VazenProject, {
+      decode: SchemaGetter.transformEffect((tables, options) =>
+        Effect.fromResult(
+          pipe(
+            SchemaParser.decodeUnknownResult(DeclaredVersion)(tables, {
+              ...options,
+              onExcessProperty: 'ignore',
+              reportInput: true,
+            }),
+            Result.flatMap(({ schema_version: declaredVersion }) =>
+              SchemaParser.decodeUnknownResult(
+                VAZEN_PROJECT_FROM_VAZEN_TOML_PROJECT_BY_VERSION[
+                  declaredVersion
+                ],
+              )(tables, options),
+            ),
+          ),
         ),
       ),
-    encode: (project, options) =>
-      ParseResult.encodeEither(
-        VAZEN_PROJECT_FROM_VAZEN_TOML_PROJECT_BY_VERSION[
-          DEFAULT_WRITTEN_VERSION
-        ],
-      )(project, options),
-    strict: true,
-  }).annotations({ identifier: 'VazenProjectFromVazenTomlProject' });
+      encode: SchemaGetter.transformEffect((project, options) =>
+        Effect.fromResult(
+          SchemaParser.encodeResult(
+            VAZEN_PROJECT_FROM_VAZEN_TOML_PROJECT_BY_VERSION[
+              VAZEN_DEFAULT_WRITTEN_VERSION
+            ],
+          )(project, options),
+        ),
+      ),
+    }),
+  ).annotate({ identifier: 'VazenProjectFromVazenTomlProject' });
 
 /** The project a file was read into, as a file function returns it. */
 export const vazenProjectReadFromVazenProject = (
   project: VazenProject,
 ): VazenProjectRead => ({
+  messages: project.messages,
   project: S.encodeSync(VazenProjectFromVazenTomlProjectV0_3_0)(project),
   // A file function's project always has the source its reader gave it.
   source: S.encodeSync(Source)(Option.getOrThrow(project.source)),
@@ -77,7 +96,7 @@ export const vazenProjectReadFromVazenProject = (
  */
 export const writtenVazenTomlProject = ({
   project,
-  version = DEFAULT_WRITTEN_VERSION,
+  version = VAZEN_DEFAULT_WRITTEN_VERSION,
 }: Readonly<{
   project: VazenTomlProjectV0_3_0;
   version?: VazenVersion;
@@ -89,11 +108,9 @@ export const writtenVazenTomlProject = ({
 // Read before the rest, so a file of another version is refused for that, not
 // for what that version changed. The other keys are that version's tables' to
 // check, so they are ignored here whatever the caller's `onExcessProperty`.
-const DeclaredVersion = S.Struct({ schema_version: VazenVersion }).annotations({
-  parseOptions: { onExcessProperty: 'ignore' },
-});
+const DeclaredVersion = S.Struct({ schema_version: VazenVersion });
 
 const Source = S.Struct({
-  declaredVersion: S.optionalWith(S.String, { as: 'Option', exact: true }),
-  format: S.String,
+  ...VazenProjectSource.fields,
+  declaredVersion: S.OptionFromOptionalKey(S.String),
 });

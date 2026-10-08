@@ -15,13 +15,13 @@ import {
  * Reads a `.vazen.toml` file of any version `VazenVersion` lists, and writes
  * one as 0.3.0. `VazenProjectFromVazenTomlProject` reads and writes its tables.
  */
-export const VazenProjectFromTomlText: S.Schema<VazenProject, string> =
-  S.compose(TomlFromText, VazenProjectFromVazenTomlProject).annotations({
+export const VazenProjectFromTomlText: S.Codec<VazenProject, string> =
+  TomlFromText.pipe(S.decodeTo(VazenProjectFromVazenTomlProject)).annotate({
     identifier: 'VazenProjectFromTomlText',
   });
 
 /**
- * Reads the text of a `.vazen.toml` file as its tables. Throws a `ParseError`
+ * Reads the text of a `.vazen.toml` file as its tables. Throws a `SchemaError`
  * saying what it could not read.
  */
 export const decodeVazenProjectFromTomlFile = (
@@ -34,7 +34,7 @@ export const decodeVazenProjectFromTomlFile = (
 /**
  * Writes a project's tables as the text of a `.vazen.toml` file. It writes
  * 0.3.0, unless `version` names another version `VazenVersion` lists. Throws a
- * `ParseError` saying what it could not write.
+ * `SchemaError` saying what it could not write.
  */
 export const encodeTomlFileFromVazenProject = (
   options: Readonly<{

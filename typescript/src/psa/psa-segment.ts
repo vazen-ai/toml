@@ -124,11 +124,20 @@ export const PsaSegment = S.TaggedStruct('Segment', {
   gln: TextFromPsaCell,
   can_separate: FlagFromPsaCell,
   unknownRowsAfter: S.Array(PsaUnknownRow),
-}).annotations({ identifier: 'PsaSegment' });
+}).annotate({ identifier: 'PsaSegment' });
 export type PsaSegment = typeof PsaSegment.Type;
 
-export const PsaSegmentFromPsaRow = PsaRecordFromPsaRowFor(
-  PsaSegment,
-).annotations({
-  identifier: 'PsaSegmentFromPsaRow',
-});
+export const PsaSegmentFromPsaRow = PsaRecordFromPsaRowFor(PsaSegment).annotate(
+  {
+    identifier: 'PsaSegmentFromPsaRow',
+  },
+);
+
+/** A record with every column empty, which a new row is spread from. */
+export const PSA_EMPTY_SEGMENT: PsaSegment = S.decodeSync(PsaSegmentFromPsaRow)(
+  {
+    _tag: 'Segment',
+    cells: [],
+    unknownRowsAfter: [],
+  },
+);

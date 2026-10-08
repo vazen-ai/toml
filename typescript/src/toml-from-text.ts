@@ -1,5 +1,14 @@
-import { ParseResult, Schema as S } from 'effect';
+import { Effect, Schema as S, SchemaGetter, SchemaIssue } from 'effect';
 import { parse, stringify } from 'smol-toml';
+
+// Keep reserved prototype keys out of files and model attributes.
+export const TomlKey = S.String.pipe(
+  S.check(
+    S.makeFilter((key) => key !== '__proto__', {
+      description: 'a key other than "__proto__"',
+    }),
+  ),
+);
 
 export type TomlValue =
   boolean | number | string | Date | ReadonlyArray<TomlValue> | TomlTable;
@@ -10,21 +19,22 @@ export type TomlTable = { readonly [key: string]: TomlValue };
  * Any value a TOML document can hold. smol-toml reads dates and times as
  * `Date`s.
  */
-export const TomlValue: S.Schema<TomlValue> = S.suspend(() =>
-  S.Union(
+export const TomlValue: S.Codec<TomlValue> = S.suspend(() =>
+  S.Union([
     S.Boolean,
-    S.ValidDateFromSelf,
+    S.Date,
     S.Number,
     S.String,
     S.Array(TomlValue),
     TomlTable,
-  ),
-).annotations({ identifier: 'TomlValue' });
+  ]),
+).annotate({ identifier: 'TomlValue' });
 
-export const TomlTable: S.Schema<TomlTable> = S.Record({
-  key: S.String,
-  value: TomlValue,
-}).annotations({ identifier: 'TomlTable' });
+export const TomlTable: S.Codec<TomlTable> = S.Record(S.String, TomlValue)
+  .check(S.isPropertyNames(TomlKey))
+  .annotate({
+    identifier: 'TomlTable',
+  });
 
 /**
  * The value a TOML document holds, from its text, left for the schema composed
@@ -33,19 +43,24 @@ export const TomlTable: S.Schema<TomlTable> = S.Record({
  * rounding it. Writing puts every table under its own header, and drops
  * comments and the difference between `1.0` and `1`.
  */
-export const TomlFromText = S.transformOrFail(S.String, S.Unknown, {
-  decode: (text, _, ast) =>
-    ParseResult.try({
-      catch: (error) => new ParseResult.Type(ast, text, messageOf(error)),
-      try: () => parse(text),
-    }),
-  encode: (value, _, ast) =>
-    ParseResult.try({
-      catch: (error) => new ParseResult.Type(ast, value, messageOf(error)),
-      try: () => stringify(value),
-    }),
-  strict: true,
-}).annotations({ identifier: 'TomlFromText' });
+export const TomlFromText = S.String.pipe(
+  S.decodeTo(S.Unknown, {
+    decode: SchemaGetter.transformEffect((text, _) =>
+      Effect.try({
+        catch: (error) =>
+          new SchemaIssue.InvalidValue({ message: messageOf(error) }, text),
+        try: () => parse(text),
+      }),
+    ),
+    encode: SchemaGetter.transformEffect((value, _) =>
+      Effect.try({
+        catch: (error) =>
+          new SchemaIssue.InvalidValue({ message: messageOf(error) }, value),
+        try: () => stringify(value),
+      }),
+    ),
+  }),
+).annotate({ identifier: 'TomlFromText' });
 
 const messageOf = (error: unknown) =>
   error instanceof Error ? error.message : String(error);

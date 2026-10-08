@@ -23,7 +23,7 @@ const IgnoredRows = S.TaggedStruct('IgnoredRows', {
 });
 
 /**
- * What reading a file gave up, or could not be sure of:
+ * Findings from reading a PSA file:
  *
  * - `UnlistedWidth`: rows with a number of cells no listed version gives their
  *   type, read by position, so their values may be in the wrong columns.
@@ -32,10 +32,10 @@ const IgnoredRows = S.TaggedStruct('IgnoredRows', {
  * - `IgnoredRows`: rows with no place in `PsaData`, such as positions before
  *   any fixture in their planogram, ignored.
  */
-export const PsaCompromise = S.Union(
+export const PsaMessage = S.Union([
   UnlistedWidth,
   DroppedCells,
   UnreadCells,
   IgnoredRows,
-).annotations({ identifier: 'PsaCompromise' });
-export type PsaCompromise = typeof PsaCompromise.Type;
+]).annotate({ identifier: 'PsaMessage' });
+export type PsaMessage = typeof PsaMessage.Type;

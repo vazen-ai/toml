@@ -1,5 +1,6 @@
 // What a user needs to read and write a Vazen TOML file; the rest is how it
 // does it.
+export { type Orientation as VazenOrientation } from './orientation';
 export { type VazenTomlProjectV0_3_0 } from './specification/vazen-toml-project-v0-3-0';
 export { type VazenAttributes } from './vazen-attributes';
 export { type VazenEquipment } from './vazen-equipment';
@@ -32,7 +33,6 @@ export {
 } from './vazen-project-from-vazen-toml-project';
 export {
   VAZEN_SITE_DEFAULTS,
-  type VazenOrientation,
   type VazenProductSelector,
   type VazenSite,
 } from './vazen-site';
@@ -58,10 +58,10 @@ export {
   PsaDataFromPsaBytes,
   PsaDataFromPsaText,
   PsaVersion,
-  type PsaCompromise,
   type PsaData,
   type PsaFixture,
   type PsaFixtureSection,
+  type PsaMessage,
   type PsaPerformance,
   type PsaPlanogram,
   type PsaPlanogramSection,

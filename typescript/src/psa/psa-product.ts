@@ -694,11 +694,20 @@ export const PsaProduct = S.TaggedStruct('Product', {
   dairy_free: FlagFromPsaCell,
   price_tier: TextFromPsaCell,
   unknownRowsAfter: S.Array(PsaUnknownRow),
-}).annotations({ identifier: 'PsaProduct' });
+}).annotate({ identifier: 'PsaProduct' });
 export type PsaProduct = typeof PsaProduct.Type;
 
-export const PsaProductFromPsaRow = PsaRecordFromPsaRowFor(
-  PsaProduct,
-).annotations({
-  identifier: 'PsaProductFromPsaRow',
-});
+export const PsaProductFromPsaRow = PsaRecordFromPsaRowFor(PsaProduct).annotate(
+  {
+    identifier: 'PsaProductFromPsaRow',
+  },
+);
+
+/** A record with every column empty, which a new row is spread from. */
+export const PSA_EMPTY_PRODUCT: PsaProduct = S.decodeSync(PsaProductFromPsaRow)(
+  {
+    _tag: 'Product',
+    cells: [],
+    unknownRowsAfter: [],
+  },
+);

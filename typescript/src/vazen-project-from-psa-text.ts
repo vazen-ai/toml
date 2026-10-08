@@ -20,8 +20,8 @@ import { VazenProjectFromVazenTomlProjectV0_3_0 } from './vazen-project-from-vaz
  * version of the PSA file it came from, or 2024.4.0 when it came from none or
  * from a version `PsaVersion` does not list.
  */
-export const VazenProjectFromPsaText: S.Schema<VazenProject, string> =
-  S.compose(PsaDataFromPsaText, VazenProjectFromPsaData).annotations({
+export const VazenProjectFromPsaText: S.Codec<VazenProject, string> =
+  PsaDataFromPsaText.pipe(S.decodeTo(VazenProjectFromPsaData)).annotate({
     identifier: 'VazenProjectFromPsaText',
   });
 
@@ -29,15 +29,15 @@ export const VazenProjectFromPsaText: S.Schema<VazenProject, string> =
  * Reads a PSA file's bytes as a project, and writes them as
  * `VazenProjectFromPsaText` does.
  */
-export const VazenProjectFromPsaBytes: S.Schema<VazenProject, Uint8Array> =
-  S.compose(PsaDataFromPsaBytes, VazenProjectFromPsaData).annotations({
+export const VazenProjectFromPsaBytes: S.Codec<VazenProject, Uint8Array> =
+  PsaDataFromPsaBytes.pipe(S.decodeTo(VazenProjectFromPsaData)).annotate({
     identifier: 'VazenProjectFromPsaBytes',
   });
 
 /**
- * Reads a PSA file's bytes as the tables of a 0.3.0 layout. Drops what the
- * records reader lists in `compromises`. Throws a `ParseError` saying what it
- * could not read.
+ * Reads a PSA file's bytes as the tables of a 0.3.0 layout, with losses and
+ * uncertain interpretations in `messages`. Throws a `SchemaError`
+ * when it cannot produce a project satisfying the schema.
  */
 export const decodeVazenProjectFromPsaFile = (
   bytes: Uint8Array,
@@ -48,7 +48,7 @@ export const decodeVazenProjectFromPsaFile = (
 
 /**
  * Writes a project's tables as a PSA file's bytes. It writes 2024.4.0, unless
- * `version` names another version `PsaVersion` lists. Throws a `ParseError`
+ * `version` names another version `PsaVersion` lists. Throws a `SchemaError`
  * saying what it could not write, such as a value in a column the version does
  * not have.
  */

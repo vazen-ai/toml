@@ -1,7 +1,7 @@
 import { Schema as S } from 'effect';
 
-import { PsaCompromise } from './psa-compromises';
 import { PsaFixture } from './psa-fixture';
+import { PsaMessage } from './psa-messages';
 import { PsaPerformance } from './psa-performance';
 import { PsaPlanogram } from './psa-planogram';
 import { PsaPosition } from './psa-position';
@@ -13,23 +13,23 @@ import { PsaSegment } from './psa-segment';
  * A planogram and the records after it, up to the next, in the file's order.
  */
 const PsaPlanogramRecords = S.Struct({
-  planogram: S.typeSchema(PsaPlanogram),
+  planogram: S.toType(PsaPlanogram),
   records: S.Array(
-    S.Union(
-      S.typeSchema(PsaFixture),
-      S.typeSchema(PsaPerformance),
-      S.typeSchema(PsaPosition),
-      S.typeSchema(PsaSegment),
-    ),
+    S.Union([
+      S.toType(PsaFixture),
+      S.toType(PsaPerformance),
+      S.toType(PsaPosition),
+      S.toType(PsaSegment),
+    ]),
   ),
-}).annotations({ identifier: 'PsaPlanogramRecords' });
+}).annotate({ identifier: 'PsaPlanogramRecords' });
 
 /** A file's project, its products, and each planogram with its records. */
 export const PsaSections = S.Struct({
-  compromises: S.Array(PsaCompromise),
-  declaredVersion: S.OptionFromSelf(S.String),
+  declaredVersion: S.Option(S.String),
+  messages: S.Array(PsaMessage),
   planograms: S.Array(PsaPlanogramRecords),
-  products: S.Array(S.typeSchema(PsaProduct)),
-  project: S.typeSchema(PsaProject),
-}).annotations({ identifier: 'PsaSections' });
+  products: S.Array(S.toType(PsaProduct)),
+  project: S.toType(PsaProject),
+}).annotate({ identifier: 'PsaSections' });
 export type PsaSections = typeof PsaSections.Type;

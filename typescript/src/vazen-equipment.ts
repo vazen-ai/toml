@@ -1,6 +1,6 @@
 import { Schema as S, type Option } from 'effect';
 
-import { VAZEN_KNOWN_KEYS_ONLY, VazenAttributes } from './vazen-attributes';
+import { knownKeysOnly, VazenAttributes } from './vazen-attributes';
 import { VazenDimensions, VazenPosition } from './vazen-geometry';
 import { VazenSite } from './vazen-site';
 
@@ -23,10 +23,12 @@ export type VazenEquipment = {
  */
 export const VazenEquipment = S.Struct({
   attributes: VazenAttributes,
-  dimensions: S.OptionFromSelf(VazenDimensions),
-  equipment: S.Array(S.suspend((): S.Schema<VazenEquipment> => VazenEquipment)),
-  position: S.OptionFromSelf(VazenPosition),
+  dimensions: S.Option(VazenDimensions),
+  equipment: S.Array(S.suspend((): S.Codec<VazenEquipment> => VazenEquipment)),
+  position: S.Option(VazenPosition),
   sites: S.Array(VazenSite),
-  sortOrder: S.OptionFromSelf(S.Finite),
+  sortOrder: S.Option(S.Finite),
   type: S.String,
-}).annotations({ identifier: 'VazenEquipment', ...VAZEN_KNOWN_KEYS_ONLY });
+})
+  .pipe(knownKeysOnly)
+  .annotate({ identifier: 'VazenEquipment' });

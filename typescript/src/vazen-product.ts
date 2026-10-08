@@ -1,7 +1,7 @@
 import { Schema as S } from 'effect';
 
 import { TomlTable } from './toml-from-text';
-import { VAZEN_KNOWN_KEYS_ONLY, VazenAttributes } from './vazen-attributes';
+import { knownKeysOnly, VazenAttributes } from './vazen-attributes';
 import { VazenDimensions } from './vazen-geometry';
 
 const GTIN_PATTERN = /^(\d{8}|\d{12}|\d{13}|\d{14})$/;
@@ -10,7 +10,9 @@ const GTIN_PATTERN = /^(\d{8}|\d{12}|\d{13}|\d{14})$/;
  * A string of 8, 12, 13 or 14 digits. Not required to be unique within a file:
  * a shelf test can hold two variants of one GTIN.
  */
-export const VazenGtin = S.String.pipe(S.pattern(GTIN_PATTERN)).annotations({
+export const VazenGtin = S.String.pipe(
+  S.check(S.isPattern(GTIN_PATTERN)),
+).annotate({
   identifier: 'VazenGtin',
 });
 
@@ -24,19 +26,23 @@ export type VazenGtin = typeof VazenGtin.Type;
 export const VazenProductImage = S.Struct({
   attributes: TomlTable,
   url: S.String,
-}).annotations({ identifier: 'VazenProductImage', ...VAZEN_KNOWN_KEYS_ONLY });
+})
+  .pipe(knownKeysOnly)
+  .annotate({ identifier: 'VazenProductImage' });
 
 export type VazenProductImage = typeof VazenProductImage.Type;
 
 /** Images keyed by the face they show, named as under Orientation. */
 export const VazenProductImages = S.Struct({
-  back: S.OptionFromSelf(VazenProductImage),
-  base: S.OptionFromSelf(VazenProductImage),
-  front: S.OptionFromSelf(VazenProductImage),
-  top: S.OptionFromSelf(VazenProductImage),
-  right: S.OptionFromSelf(VazenProductImage),
-  left: S.OptionFromSelf(VazenProductImage),
-}).annotations({ identifier: 'VazenProductImages', ...VAZEN_KNOWN_KEYS_ONLY });
+  back: S.Option(VazenProductImage),
+  base: S.Option(VazenProductImage),
+  front: S.Option(VazenProductImage),
+  top: S.Option(VazenProductImage),
+  right: S.Option(VazenProductImage),
+  left: S.Option(VazenProductImage),
+})
+  .pipe(knownKeysOnly)
+  .annotate({ identifier: 'VazenProductImages' });
 
 export type VazenProductImages = typeof VazenProductImages.Type;
 
@@ -50,12 +56,14 @@ export type VazenProductImages = typeof VazenProductImages.Type;
  */
 export const VazenProduct = S.Struct({
   attributes: VazenAttributes,
-  dimensions: S.OptionFromSelf(VazenDimensions),
-  form: S.OptionFromSelf(S.String),
-  gtin: S.OptionFromSelf(VazenGtin),
-  images: S.OptionFromSelf(VazenProductImages),
+  dimensions: S.Option(VazenDimensions),
+  form: S.Option(S.String),
+  gtin: S.Option(VazenGtin),
+  images: S.Option(VazenProductImages),
   name: S.String,
-  ref: S.OptionFromSelf(S.String),
-}).annotations({ identifier: 'VazenProduct', ...VAZEN_KNOWN_KEYS_ONLY });
+  ref: S.Option(S.String),
+})
+  .pipe(knownKeysOnly)
+  .annotate({ identifier: 'VazenProduct' });
 
 export type VazenProduct = typeof VazenProduct.Type;

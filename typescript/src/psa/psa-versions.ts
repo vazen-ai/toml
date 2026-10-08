@@ -28,13 +28,13 @@ export const PSA_DEFAULT_WRITTEN_VERSION: PsaVersion = '2024.4.0';
  * A PSA record type this package reads; a row of any other type is kept as it
  * is.
  */
-export const PsaRecordType = S.Literal(
-  ...Record.keys(PSA_VERSION_COLUMN_COUNTS['2017.1.0']),
+export const PsaRecordType = S.Literals(
+  Record.keys(PSA_VERSION_COLUMN_COUNTS['2017.1.0']),
 );
 export type PsaRecordType = typeof PsaRecordType.Type;
 
 /** A version a file can be written as. */
-export const PsaVersion = S.Literal(
-  ...Record.keys(PSA_VERSION_COLUMN_COUNTS),
-).annotations({ identifier: 'PsaVersion' });
+export const PsaVersion = S.Literals(
+  Record.keys(PSA_VERSION_COLUMN_COUNTS),
+).annotate({ identifier: 'PsaVersion' });
 export type PsaVersion = typeof PsaVersion.Type;

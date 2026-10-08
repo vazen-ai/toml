@@ -8,25 +8,34 @@ import { TomlTable } from './toml-from-text';
 // specification advises against: which to use is up to whoever writes the file.
 const NAMESPACED_KEY = /^_[a-z\d-]+(?:_[a-z\d-]+)*__./;
 
-/**
- * Spread into a noun's annotations, so a project built with a key the noun does
- * not declare is refused when written, rather than losing the key. TypeScript
- * catches the slip; a JavaScript caller has only this.
- */
-export const VAZEN_KNOWN_KEYS_ONLY = {
-  parseOptions: { onExcessProperty: 'error' },
-} as const;
+/** The namespace of a PSA column kept as an attribute, as in `_psa__brand`. */
+export const PSA_KEY_PREFIX = '_psa__';
+
+/** Refuse extra keys when reading or writing a model. */
+export const knownKeysOnly = <Fields extends S.Struct.Fields>(
+  schema: S.Struct<Fields>,
+) =>
+  schema.rebuild(
+    S.StructWithRest(schema, [
+      S.Record(
+        S.String.check(
+          S.makeFilter((key) => !Object.hasOwn(schema.fields, key)),
+        ),
+        S.Never,
+      ),
+    ]).ast,
+  );
 
 /**
  * A TOML scalar: what a product selector matches on, and what a descriptive key
  * holds.
  */
-export const VazenAttributeScalar = S.Union(
+export const VazenAttributeScalar = S.Union([
   S.Boolean,
-  S.ValidDateFromSelf,
+  S.Date,
   S.Number,
   S.String,
-).annotations({ identifier: 'VazenAttributeScalar' });
+]).annotate({ identifier: 'VazenAttributeScalar' });
 
 export type VazenAttributeScalar = typeof VazenAttributeScalar.Type;
 
@@ -37,21 +46,25 @@ export type VazenAttributeScalar = typeof VazenAttributeScalar.Type;
  * scalars.
  */
 export const VazenAttributes = TomlTable.pipe(
-  S.filter((attributes) =>
-    A.filterMap(Record.toEntries(attributes), ([key, value]) =>
-      NAMESPACED_KEY.test(key) || isDescriptiveValue(value)
-        ? Option.none()
-        : Option.some({
-            message:
-              'a descriptive key holds a scalar or an array of scalars; a table needs a namespaced key',
-            path: [key],
-          }),
+  S.check(
+    S.makeFilter((attributes) =>
+      A.getSomes(
+        A.map(Record.toEntries(attributes), ([key, value]) =>
+          NAMESPACED_KEY.test(key) || isDescriptiveValue(value)
+            ? Option.none()
+            : Option.some({
+                issue:
+                  'a descriptive key holds a scalar or an array of scalars; a table needs a namespaced key',
+                path: [key],
+              }),
+        ),
+      ),
     ),
   ),
-).annotations({ identifier: 'VazenAttributes' });
+).annotate({ identifier: 'VazenAttributes' });
 
 export type VazenAttributes = typeof VazenAttributes.Type;
 
 const isDescriptiveValue = S.is(
-  S.Union(VazenAttributeScalar, S.Array(VazenAttributeScalar)),
+  S.Union([VazenAttributeScalar, S.Array(VazenAttributeScalar)]),
 );

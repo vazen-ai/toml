@@ -1,4 +1,4 @@
-import { Option, pipe, Schema as S } from 'effect';
+import { Option, Schema as S } from 'effect';
 
 import type { PsaData } from './psa-data';
 import { PsaDataFromPsaSections } from './psa-data-from-psa-sections';
@@ -21,22 +21,22 @@ import { TextFromBytes } from './text-from-bytes';
  * Reads a PSA file of any version, and writes it as the version its data
  * declares, 2024.4.0 when it declares none or one `PsaVersion` does not list.
  */
-export const PsaDataFromPsaText: S.Schema<PsaData, string> = pipe(
-  PsaLinesFromText,
-  S.compose(PsaRowsFromPsaLines),
-  S.compose(PsaRecordsFromPsaRows),
-  S.compose(PsaSectionsFromPsaRecords),
-  S.compose(PsaDataFromPsaSections),
-).annotations({ identifier: 'PsaDataFromPsaText' });
+export const PsaDataFromPsaText: S.Codec<PsaData, string> =
+  PsaLinesFromText.pipe(
+    S.decodeTo(PsaRowsFromPsaLines),
+    S.decodeTo(PsaRecordsFromPsaRows),
+    S.decodeTo(PsaSectionsFromPsaRecords),
+    S.decodeTo(PsaDataFromPsaSections),
+  ).annotate({ identifier: 'PsaDataFromPsaText' });
 
 /** Reads a PSA file's bytes, and writes them as `PsaDataFromPsaText` does. */
-export const PsaDataFromPsaBytes: S.Schema<PsaData, Uint8Array> = pipe(
-  TextFromBytes,
-  S.compose(PsaDataFromPsaText),
-).annotations({ identifier: 'PsaDataFromPsaBytes' });
+export const PsaDataFromPsaBytes: S.Codec<PsaData, Uint8Array> =
+  TextFromBytes.pipe(S.decodeTo(PsaDataFromPsaText)).annotate({
+    identifier: 'PsaDataFromPsaBytes',
+  });
 
 /**
- * Reads a PSA file's bytes as its records. Throws a `ParseError` saying what it
+ * Reads a PSA file's bytes as its records. Throws a `SchemaError` saying what it
  * could not read.
  */
 export const decodePsaDataFromPsaFile: (bytes: Uint8Array) => PsaData =
@@ -45,7 +45,7 @@ export const decodePsaDataFromPsaFile: (bytes: Uint8Array) => PsaData =
 /**
  * Writes PSA data as a file's bytes: the version given, else the version the
  * data declares when `PsaVersion` lists it and its rows hold every value, else
- * 2024.4.0. Throws a `ParseError` saying what it could not write, such as a
+ * 2024.4.0. Throws a `SchemaError` saying what it could not write, such as a
  * value in a column the version given does not have.
  */
 export const encodePsaFileFromPsaData = ({
@@ -54,7 +54,7 @@ export const encodePsaFileFromPsaData = ({
 }: Readonly<{ data: PsaData; version?: PsaVersion }>): Uint8Array =>
   S.encodeSync(PsaDataFromPsaBytes)({
     ...data,
-    declaredVersion: Option.orElse(Option.fromNullable(version), () =>
+    declaredVersion: Option.orElse(Option.fromNullishOr(version), () =>
       Option.filter(
         data.declaredVersion,
         (declared) =>

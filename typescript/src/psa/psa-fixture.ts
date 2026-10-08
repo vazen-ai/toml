@@ -380,11 +380,20 @@ export const PsaFixture = S.TaggedStruct('Fixture', {
   bracket_height: NumberFromPsaCell,
   bracket_depth: NumberFromPsaCell,
   unknownRowsAfter: S.Array(PsaUnknownRow),
-}).annotations({ identifier: 'PsaFixture' });
+}).annotate({ identifier: 'PsaFixture' });
 export type PsaFixture = typeof PsaFixture.Type;
 
-export const PsaFixtureFromPsaRow = PsaRecordFromPsaRowFor(
-  PsaFixture,
-).annotations({
-  identifier: 'PsaFixtureFromPsaRow',
-});
+export const PsaFixtureFromPsaRow = PsaRecordFromPsaRowFor(PsaFixture).annotate(
+  {
+    identifier: 'PsaFixtureFromPsaRow',
+  },
+);
+
+/** A record with every column empty, which a new row is spread from. */
+export const PSA_EMPTY_FIXTURE: PsaFixture = S.decodeSync(PsaFixtureFromPsaRow)(
+  {
+    _tag: 'Fixture',
+    cells: [],
+    unknownRowsAfter: [],
+  },
+);

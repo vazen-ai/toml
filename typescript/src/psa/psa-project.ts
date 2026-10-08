@@ -461,11 +461,20 @@ export const PsaProject = S.TaggedStruct('Project', {
   inventory_model_demand_mean_variance: FlagFromPsaCell,
   service_level: NumberFromPsaCell,
   unknownRowsAfter: S.Array(PsaUnknownRow),
-}).annotations({ identifier: 'PsaProject' });
+}).annotate({ identifier: 'PsaProject' });
 export type PsaProject = typeof PsaProject.Type;
 
-export const PsaProjectFromPsaRow = PsaRecordFromPsaRowFor(
-  PsaProject,
-).annotations({
-  identifier: 'PsaProjectFromPsaRow',
-});
+export const PsaProjectFromPsaRow = PsaRecordFromPsaRowFor(PsaProject).annotate(
+  {
+    identifier: 'PsaProjectFromPsaRow',
+  },
+);
+
+/** A record with every column empty, which a new row is spread from. */
+export const PSA_EMPTY_PROJECT: PsaProject = S.decodeSync(PsaProjectFromPsaRow)(
+  {
+    _tag: 'Project',
+    cells: [],
+    unknownRowsAfter: [],
+  },
+);
