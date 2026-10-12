@@ -45,8 +45,9 @@ stating a format once and having the code follow it.
 
 The [current specification](https://toml.vazen.com/spec) is a draft and open for
 feedback. The `@vazen-ai/toml` package reads and writes Vazen TOML 0.3.0 and
-[PSA files](https://toml.vazen.com/psa). Planned tooling includes Python
-packages, JSON Schemas, and a web converter and visualiser. See
+[PSA files](https://toml.vazen.com/psa), in code or with its
+[`vazen-toml` command](typescript/README.md#command-line). Planned tooling
+includes Python packages, JSON Schemas, and a web converter and visualiser. See
 [the website](https://toml.vazen.com/) for the current roadmap.
 
 ## Get involved

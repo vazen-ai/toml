@@ -116,3 +116,41 @@ jobs:
 
           An npm owner checks these, then approves it under Staged Packages on npmjs.com.
           EOF
+
+  draft:
+    name: Draft the GitHub release
+    needs: [pack, stage]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # The only job that can write to the repository. It checks out and runs nothing from it, and
+    # the main rulesets stop it updating main.
+    permissions:
+      contents: write
+    steps:
+      - name: Draft the release from the changelog
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.pack.outputs.version }}
+        run: |
+          # This version's section, with each paragraph and list item on one line: release notes
+          # render every line break.
+          gh api "repos/$GH_REPO/contents/typescript/CHANGELOG.md?ref=$GITHUB_SHA" \
+            --header 'Accept: application/vnd.github.raw+json' |
+            awk -v heading="## [$VERSION] - " '
+              index($0, heading) == 1 { found = 1; next }
+              !found || !n && /^$/ { next }
+              /^## / { exit }
+              /^```/ { fenced = !fenced; lines[++n] = $0; next }
+              fenced || /^(#|- |$)/ || lines[n] ~ /^(```|#|$)/ { lines[++n] = $0; next }
+              { sub(/^ +/, ""); lines[n] = lines[n] " " $0 }
+              END {
+                while (n && lines[n] == "") n--
+                for (i = 1; i <= n; i++) print lines[i]
+                exit !found
+              }
+            ' > "$RUNNER_TEMP/notes.md"
+          # A draft creates its tag when it is published.
+          url=$(gh release create "@vazen-ai/toml@$VERSION" --draft --target "$GITHUB_SHA" \
+            --title "@vazen-ai/toml $VERSION" --notes-file "$RUNNER_TEMP/notes.md")
+          echo "After approving on npm, publish [the draft GitHub release]($url)." >> "$GITHUB_STEP_SUMMARY"

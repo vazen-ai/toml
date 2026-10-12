@@ -123,6 +123,35 @@ writeFileSync(
 [Read and convert ProSpace PSA planogram files](https://toml.vazen.com/psa)
 shows each conversion with a made-up PSA file to try.
 
+## Command line
+
+The `vazen-toml` command reads a PSA, TOML or JSON file, on Node.js 24 or later,
+and prints what it finds. It never changes the file, and nothing leaves the
+machine.
+
+```sh
+npx @vazen-ai/toml inspect end-of-aisle.psa
+npx @vazen-ai/toml convert end-of-aisle.psa --to toml --plan 1 > aisle.vazen.toml
+```
+
+`inspect` prints the file's format, declared version, encoding, messages, plans
+and the number of rows of each record type, as JSON. `convert` prints the file
+as Vazen TOML or JSON. `--plan` keeps one plan, numbered as `inspect` lists
+them, and every product. Diagnostics go to stderr, one JSON object per line,
+each with a `kind` and a `message`. A message from reading the file takes its
+`_tag` as its `kind`, with its details beside it. When `npx` installs the
+package first, its own output comes before them. The exit code says what
+happened:
+
+| Code | Meaning                                                                                          |
+| ---- | ------------------------------------------------------------------------------------------------ |
+| 0    | Done.                                                                                            |
+| 1    | Unexpected error.                                                                                |
+| 2    | The arguments are wrong.                                                                         |
+| 3    | The file cannot be read.                                                                         |
+| 4    | Done, but reading the file reported messages, such as lost values. Each message is a diagnostic. |
+| 5    | The file cannot be written in the format asked for.                                              |
+
 ## Reading and writing
 
 Each format has a pair of file functions. `decodeVazenProjectFromTomlFile` and

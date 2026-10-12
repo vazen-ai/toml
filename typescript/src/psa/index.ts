@@ -90,7 +90,11 @@ export {
   PsaSegment,
   PsaSegmentFromPsaRow,
 } from './psa-segment';
-export { TextFromBytes } from './text-from-bytes';
+export {
+  psaTextFromBytes,
+  TextFromBytes,
+  type PsaEncoding,
+} from './text-from-bytes';
 export {
   PSA_DEFAULT_WRITTEN_VERSION,
   PsaRecordType,
