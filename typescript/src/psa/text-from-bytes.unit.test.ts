@@ -1,11 +1,28 @@
 import { Option, Result, Schema as S } from 'effect';
 import { describe, expect, it } from 'vitest';
 
-import { TextFromBytes } from './text-from-bytes';
+import { psaTextFromBytes, TextFromBytes } from './text-from-bytes';
 
 const decode = S.decodeUnknownSync(TextFromBytes);
 const encode = S.encodeSync(TextFromBytes);
 const encodeEither = S.encodeResult(TextFromBytes);
+
+describe('psaTextFromBytes', () => {
+  it.each([
+    ['ASCII', [0x41], 'utf-8'],
+    ['UTF-8', [0x43, 0x61, 0x66, 0xc3, 0xa9], 'utf-8'],
+    ['UTF-8 after a byte-order mark', [0xef, 0xbb, 0xbf, 0x41], 'utf-8'],
+    // é is 0xE9: it does not start a valid UTF-8 sequence.
+    ['other bytes', [0x43, 0x61, 0x66, 0xe9], 'windows-1252'],
+  ])('names the encoding of %s', (_, bytes, encoding) => {
+    expect(
+      Result.map(
+        psaTextFromBytes(Uint8Array.from(bytes)),
+        (read) => read.encoding,
+      ),
+    ).toEqual(Result.succeed(encoding));
+  });
+});
 
 describe('TextFromBytes', () => {
   it.each([

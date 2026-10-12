@@ -36,38 +36,54 @@ const BYTE_BY_CHARACTER = new Map(
 const REPLACEMENT_CHARACTER = '\uFFFD';
 const NON_ASCII_RUN = /[\u0080-\u{10FFFF}]+/u;
 
+/** The encoding a PSA file's bytes are read in. */
+export type PsaEncoding = 'utf-8' | 'windows-1252';
+
 /**
- * A PSA file's text. Files are read as UTF-8 when they start with a byte-order
- * mark or are valid UTF-8, since many that declare Windows-1252 are UTF-8, and
- * as Windows-1252 otherwise; one with a byte-order mark that is not valid UTF-8
- * is refused. They are always written as Windows-1252, so text whose
- * Windows-1252 bytes are also valid UTF-8, such as `Ã©`, is refused: it
- * would read back as other text.
+ * A PSA file's text, and the encoding it was read in. A file is read as UTF-8
+ * when it starts with a byte-order mark or is valid UTF-8, since many that
+ * declare Windows-1252 are UTF-8, and as Windows-1252 otherwise. One with a
+ * byte-order mark that is not valid UTF-8 fails, with the reason.
+ */
+export const psaTextFromBytes = (
+  bytes: Uint8Array,
+): Result.Result<Readonly<{ encoding: PsaEncoding; text: string }>, string> => {
+  const marked = BYTE_ORDER_MARK.every((byte, index) => bytes[index] === byte);
+  const body = marked ? bytes.subarray(BYTE_ORDER_MARK.length) : bytes;
+  const text = Result.try(() => utf8.decode(body));
+  return marked
+    ? Result.mapBoth(text, {
+        onFailure: () =>
+          'the file starts with a UTF-8 byte-order mark but is not valid UTF-8',
+        onSuccess: (read) => ({ encoding: 'utf-8', text: read }),
+      })
+    : Result.succeed(
+        Result.match(text, {
+          onFailure: () => ({
+            encoding: 'windows-1252',
+            text: decodeWindows1252(body),
+          }),
+          onSuccess: (read) => ({ encoding: 'utf-8', text: read }),
+        }),
+      );
+};
+
+/**
+ * A PSA file's text, read as `psaTextFromBytes` reads it. Files are always
+ * written as Windows-1252, so text whose Windows-1252 bytes are also valid
+ * UTF-8, such as `Ã©`, is refused: it would read back as other text.
  */
 export const TextFromBytes = S.Uint8Array.pipe(
   S.decodeTo(S.String, {
-    decode: SchemaGetter.transformEffect((bytes, _) => {
-      const marked = BYTE_ORDER_MARK.every(
-        (byte, index) => bytes[index] === byte,
-      );
-      const body = marked ? bytes.subarray(BYTE_ORDER_MARK.length) : bytes;
-      const text = Result.try(() => utf8.decode(body));
-      return marked
-        ? Effect.fromResult(
-            Result.mapError(
-              text,
-              () =>
-                new SchemaIssue.InvalidValue(
-                  {
-                    message:
-                      'the file starts with a UTF-8 byte-order mark but is not valid UTF-8',
-                  },
-                  bytes,
-                ),
-            ),
-          )
-        : Effect.succeed(Result.getOrElse(text, () => decodeWindows1252(body)));
-    }),
+    decode: SchemaGetter.transformEffect((bytes, _) =>
+      Effect.fromResult(
+        Result.mapBoth(psaTextFromBytes(bytes), {
+          onFailure: (message) =>
+            new SchemaIssue.InvalidValue({ message }, bytes),
+          onSuccess: ({ text }) => text,
+        }),
+      ),
+    ),
     encode: SchemaGetter.transformEffect((text, _) => {
       const written = normalisePsaText(text);
       // Each character Windows-1252 holds is one UTF-16 code unit and one byte.

@@ -8,6 +8,15 @@ the Vazen TOML file format's `schema_version`.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-12
+
+### Added
+
+- Inspect and convert PSA, TOML and JSON files with the `vazen-toml` CLI, as
+  `npx @vazen-ai/toml inspect end-of-aisle.psa`. The README's Command line
+  section lists its diagnostics and exit codes. The CLI adds
+  `@effect/platform-node-shared` as a dependency.
+
 ## [0.2.1] - 2026-10-08
 
 ### Fixed
