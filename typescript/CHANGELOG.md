@@ -1,12 +1,27 @@
 # Changelog
 
-Changes to the `@vazen-ai/toml` npm package. Package versions are independent of
-the Vazen TOML file format's `schema_version`.
+Changes to the `@vazen/toml` npm package, published as `@vazen-ai/toml` up to
+0.3.0. Package versions are independent of the Vazen TOML file format's
+`schema_version`.
 
 <!-- Each version repeats the Added, Changed and Fixed headings. -->
 <!-- markdownlint-configure-file { "MD024": { "siblings_only": true } } -->
 
 ## [Unreleased]
+
+## [0.4.0] - 2026-10-13
+
+### Changed
+
+- Move the package from `@vazen-ai/toml` to `@vazen/toml`. Replace
+  `@vazen-ai/toml` with `@vazen/toml` in imports and `package.json`.
+  `@vazen-ai/toml` is deprecated, and its versions stay on npm.
+
+### Fixed
+
+- Report a planogram without a key, which reading gives an id such as
+  `planogram-1` and writing puts in its key, as a `GeneratedIds` message. The
+  `vazen-toml` command now exits 4 for such a file.
 
 ## [0.3.0] - 2026-10-12
 
@@ -77,9 +92,9 @@ Reading checks the shape of a file. It does not check the specification's rules
 of a whole file, nor its spatial rules. A project read from a PSA file drops
 what the records reader lists as compromises, such as a cell its column could
 not read; `decodePsaDataFromPsaFile` shows them.
-[The package README](https://github.com/vazen-ai/toml/blob/main/typescript/README.md)
+[The package README](https://github.com/vazen/toml/blob/main/typescript/README.md)
 says what each function reads and writes, and
-[the PSA README](https://github.com/vazen-ai/toml/blob/main/typescript/src/psa/README.md)
+[the PSA README](https://github.com/vazen/toml/blob/main/typescript/src/psa/README.md)
 says which values the PSA reader loses and which the writer keeps.
 
 ### Requirements

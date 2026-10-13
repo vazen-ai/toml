@@ -30,7 +30,7 @@ existing libraries across languages.
   specification.
 - [`examples/`](examples/) holds example files for each version, in a folder
   named after it.
-- [`typescript/`](typescript/README.md) holds the `@vazen-ai/toml` npm package,
+- [`typescript/`](typescript/README.md) holds the `@vazen/toml` npm package,
   versioned independently of the format.
 
 The package is built on
@@ -44,7 +44,7 @@ stating a format once and having the code follow it.
 ## Project status
 
 The [current specification](https://toml.vazen.com/spec) is a draft and open for
-feedback. The `@vazen-ai/toml` package reads and writes Vazen TOML 0.3.0 and
+feedback. The `@vazen/toml` package reads and writes Vazen TOML 0.3.0 and
 [PSA files](https://toml.vazen.com/psa), in code or with its
 [`vazen-toml` command](typescript/README.md#command-line). Planned tooling
 includes Python packages, JSON Schemas, and a web converter and visualiser. See

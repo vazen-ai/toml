@@ -108,7 +108,7 @@ const UNIT_COUNT_KEY = '_vazen__unit_count';
 const IDENTITY_KEYS = new Set([`${PSA_KEY_PREFIX}id`, `${PSA_KEY_PREFIX}upc`]);
 
 // The id of a planogram without a key, numbered by its place in the file.
-const MADE_UP_ID_PREFIX = 'planogram-';
+const GENERATED_ID_PREFIX = 'planogram-';
 
 // FNV-1a over the UPC and ID, 64 bits in base 36: a ref is short and opaque.
 const FNV_OFFSET_BASIS = 0xcb_f2_9c_e4_84_22_23_25n;
@@ -901,9 +901,10 @@ export const VazenProjectFromPsaData: S.Codec<VazenProject, PsaData> =
       // The nouns are read in the file's units, each site naming its product by
       // UPC and ID; the project, which holds the units and the products, scales
       // every length and names each product by its ref. A planogram without a
-      // key is the file's Nth, since a layout needs an id. A packaging level is
-      // split from its row before scaling, and merged back after, so its
-      // dimensions are scaled as the row's are.
+      // key is the file's Nth, since a layout needs an id, and is reported,
+      // since writing puts that id in its key. A packaging level is split from
+      // its row before scaling, and merged back after, so its dimensions are
+      // scaled as the row's are.
       PsaDataWithNouns.pipe(
         S.decodeTo(VazenProjectPsaCanHold, {
           decode: SchemaGetter.transformEffect(
@@ -981,12 +982,15 @@ export const VazenProjectFromPsaData: S.Codec<VazenProject, PsaData> =
                   },
                 );
               };
-              const fixtures = withMadeUpIds(planograms).map((fixture) =>
+              const fixtures = withGeneratedIds(planograms).map((fixture) =>
                 fixtureWith({
                   fixture,
                   mapSite: resolveSite,
                   scale: millimetres,
                 }),
+              );
+              const keyless = planograms.flatMap(({ id }, index) =>
+                Option.isNone(id) ? [index + 1] : [],
               );
               const placed = new Set(
                 sitesOf(fixtures).flatMap(({ site }) =>
@@ -996,7 +1000,16 @@ export const VazenProjectFromPsaData: S.Codec<VazenProject, PsaData> =
               return Effect.succeed<VazenProject>({
                 ...project,
                 fixtures,
-                messages,
+                messages: A.isReadonlyArrayNonEmpty(keyless)
+                  ? [
+                      ...messages,
+                      {
+                        _tag: 'GeneratedIds',
+                        rows: keyless,
+                        type: 'Planogram',
+                      },
+                    ]
+                  : messages,
                 products: products
                   .flatMap((product) =>
                     withPackagingLevels({ placed, product }),
@@ -1601,13 +1614,13 @@ const fixtureWith = ({
 });
 
 // A planogram without a key is the file's Nth, skipping a number a declared key
-// or an earlier made-up id already uses, since a fixture's id is unique.
-const withMadeUpIds = (
+// or an earlier generated id already uses, since a fixture's id is unique.
+const withGeneratedIds = (
   fixtures: ReadonlyArray<VazenFixture>,
 ): ReadonlyArray<VazenFixture> => {
   const declared = new Set(fixtures.flatMap(({ id }) => Option.toArray(id)));
   const free = (number: number): number =>
-    declared.has(`${MADE_UP_ID_PREFIX}${number}`) ? free(number + 1) : number;
+    declared.has(`${GENERATED_ID_PREFIX}${number}`) ? free(number + 1) : number;
   return A.mapAccum(
     fixtures,
     1,
@@ -1617,7 +1630,7 @@ const withMadeUpIds = (
           const number = free(Math.max(next, index + 1));
           return [
             number + 1,
-            { ...fixture, id: Option.some(`${MADE_UP_ID_PREFIX}${number}`) },
+            { ...fixture, id: Option.some(`${GENERATED_ID_PREFIX}${number}`) },
           ];
         },
         onSome: () => [next, fixture],

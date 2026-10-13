@@ -1319,13 +1319,17 @@ _psa__upc = ""
     ).toContain('code 99 is not listed for its column');
   });
 
-  it('gives a planogram without a key an id, which is written back as its key, skipping a number a declared key uses', () => {
+  it('gives a planogram without a key an id, reported as generated and written back as its key, skipping a number a declared key uses', () => {
     const project = decode(dataWith({ planogram: { name: 'Keyless' } }));
     expect(project.fixtures[0]?.id).toEqual(Option.some('planogram-1'));
+    expect(project.messages).toEqual([
+      { _tag: 'GeneratedIds', rows: [1], type: 'Planogram' },
+    ]);
     expect(encode(project).planograms[0]?.planogram.key).toEqual(
       Option.some('planogram-1'),
     );
     const keyed = dataWith({ planogram: { key: 'planogram-2' } });
+    expect(decode(keyed).messages).toEqual([]);
     const taken = decode({
       ...keyed,
       planograms: [
@@ -1336,6 +1340,9 @@ _psa__upc = ""
     expect(taken.fixtures.map(({ id }) => id)).toEqual([
       Option.some('planogram-2'),
       Option.some('planogram-3'),
+    ]);
+    expect(taken.messages).toEqual([
+      { _tag: 'GeneratedIds', rows: [2], type: 'Planogram' },
     ]);
   });
 

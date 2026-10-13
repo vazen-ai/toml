@@ -12,7 +12,7 @@ permissions: {}
 jobs:
   pack:
     name: Pack the release
-    if: github.repository == 'vazen-ai/toml'
+    if: github.repository == 'vazen/toml'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -62,7 +62,7 @@ jobs:
           cd "$(mktemp -d)"
           npm init --yes > /dev/null
           npm install --ignore-scripts --no-audit --no-fund "$GITHUB_WORKSPACE/typescript/package.tgz"
-          node --input-type=module --eval "await import('@vazen-ai/toml')"
+          node --input-type=module --eval "await import('@vazen/toml')"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         id: upload
         if: steps.release.outputs.version
@@ -107,11 +107,11 @@ jobs:
 
           | | |
           | --- | --- |
-          | Package | \`@vazen-ai/toml@$VERSION\` |
-          | Stage id | \`$(jq -r '.["@vazen-ai/toml"].stageId' staged.json)\` |
+          | Package | \`@vazen/toml@$VERSION\` |
+          | Stage id | \`$(jq -r '.["@vazen/toml"].stageId' staged.json)\` |
           | Public commit | \`$GITHUB_SHA\` |
           | SHA-256 | \`$SHA256\` |
-          | Integrity | \`$(jq -r '.["@vazen-ai/toml"].integrity' staged.json)\` |
+          | Integrity | \`$(jq -r '.["@vazen/toml"].integrity' staged.json)\` |
           | Artifact | \`npm-package-$VERSION\`, kept 90 days |
 
           An npm owner checks these, then approves it under Staged Packages on npmjs.com.
@@ -151,6 +151,6 @@ jobs:
               }
             ' > "$RUNNER_TEMP/notes.md"
           # A draft creates its tag when it is published.
-          url=$(gh release create "@vazen-ai/toml@$VERSION" --draft --target "$GITHUB_SHA" \
-            --title "@vazen-ai/toml $VERSION" --notes-file "$RUNNER_TEMP/notes.md")
+          url=$(gh release create "@vazen/toml@$VERSION" --draft --target "$GITHUB_SHA" \
+            --title "@vazen/toml $VERSION" --notes-file "$RUNNER_TEMP/notes.md")
           echo "After approving on npm, publish [the draft GitHub release]($url)." >> "$GITHUB_STEP_SUMMARY"
