@@ -1,6 +1,6 @@
-# @vazen-ai/toml
+# @vazen/toml
 
-`@vazen-ai/toml` reads and writes [Vazen TOML](https://toml.vazen.com/) 0.3.0
+`@vazen/toml` reads and writes [Vazen TOML](https://toml.vazen.com/) 0.3.0
 files, `vazen/spec` and `vazen/layout`, as TOML or as JSON. It reads ProSpace
 PSA files of any version, and writes the versions `PsaVersion` lists, 2017.1.0
 to 2024.4.0. Each file reads as the tables of a 0.3.0 file. A writer writes
@@ -15,7 +15,7 @@ format's versions.
 import {
   decodeVazenProjectFromTomlFile,
   encodeJsonFileFromVazenProject,
-} from '@vazen-ai/toml';
+} from '@vazen/toml';
 
 const { project, source, messages } =
   decodeVazenProjectFromTomlFile(`schema = "vazen/spec"
@@ -87,9 +87,11 @@ the style as its `form`, the style's dimensions, and the number of units it
 holds as `_vazen__unit_count`. When written, they go back onto the same PSA
 product row. Every length is in millimetres. A value with a standard key takes
 that key. Every other value the file gives becomes a `_psa__` key on its object,
-unless the column's default already implies it. With no reported messages, the
-project writes back as the same PSA records, also after a trip through TOML or
-JSON.
+unless the column's default already implies it. A planogram without a key gets
+an id from its place in the file, such as `planogram-1`, which writing puts in
+its key, and a `GeneratedIds` message lists its row. With no reported messages,
+the project writes back as the same PSA records, also after a trip through TOML
+or JSON.
 
 The PSA bridge matches products using the project's primary key: UPC alone, ID
 alone, or the exact pair for Both. An absent primary-key cell defaults to UPC.
@@ -109,7 +111,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import {
   decodeVazenProjectFromPsaFile,
   encodeTomlFileFromVazenProject,
-} from '@vazen-ai/toml';
+} from '@vazen/toml';
 
 const { project } = decodeVazenProjectFromPsaFile(
   readFileSync('end-of-aisle.psa'),
@@ -130,8 +132,8 @@ and prints what it finds. It never changes the file, and nothing leaves the
 machine.
 
 ```sh
-npx @vazen-ai/toml inspect end-of-aisle.psa
-npx @vazen-ai/toml convert end-of-aisle.psa --to toml --plan 1 > aisle.vazen.toml
+npx @vazen/toml inspect end-of-aisle.psa
+npx @vazen/toml convert end-of-aisle.psa --to toml --plan 1 > aisle.vazen.toml
 ```
 
 `inspect` prints the file's format, declared version, encoding, messages, plans
@@ -184,10 +186,10 @@ The functions above read a file as a project. To edit the columns of a PSA file,
 read its records instead. `decodePsaDataFromPsaFile` returns `PsaData`, the rows
 of the file as records. `encodePsaFileFromPsaData` writes the records back to a
 file.
-[The PSA README](https://github.com/vazen-ai/toml/blob/main/typescript/src/psa/README.md)
+[The PSA README](https://github.com/vazen/toml/blob/main/typescript/src/psa/README.md)
 says which values the reader loses and which values the writer keeps.
 
 The package is ESM only, for Node.js 24 or later. It needs Effect 4.0.0 or a
 later 4.x release as a peer dependency. To work on the package, run `npm ci`
 then `npm run verify` here. Licensing is in
-[LICENSING.md](https://github.com/vazen-ai/toml/blob/main/LICENSING.md).
+[LICENSING.md](https://github.com/vazen/toml/blob/main/LICENSING.md).

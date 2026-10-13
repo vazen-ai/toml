@@ -1,6 +1,6 @@
 {
-  "name": "@vazen-ai/toml",
-  "version": "0.3.0",
+  "name": "@vazen/toml",
+  "version": "0.4.0",
   "description": "Read and write Vazen TOML 0.3.0 files, as TOML or JSON, and ProSpace PSA planogram files.",
   "keywords": [
     "blue-yonder",
@@ -14,13 +14,13 @@
     "vazen"
   ],
   "homepage": "https://toml.vazen.com/",
-  "bugs": "https://github.com/vazen-ai/toml/issues",
+  "bugs": "https://github.com/vazen/toml/issues",
   "license": "(Apache-2.0 AND CC-BY-4.0)",
   "author": "Vazen Technologies Ltd (https://www.vazen.com/)",
   "repository": {
     "directory": "typescript",
     "type": "git",
-    "url": "git+https://github.com/vazen-ai/toml.git"
+    "url": "git+https://github.com/vazen/toml.git"
   },
   "type": "module",
   "engines": {

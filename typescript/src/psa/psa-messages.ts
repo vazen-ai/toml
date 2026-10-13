@@ -21,6 +21,10 @@ const IgnoredRows = S.TaggedStruct('IgnoredRows', {
   rows: S.Array(S.Number),
   type: PsaRecordType,
 });
+const GeneratedIds = S.TaggedStruct('GeneratedIds', {
+  rows: S.Array(S.Number),
+  type: S.Literal('Planogram'),
+});
 
 /**
  * Findings from reading a PSA file:
@@ -31,11 +35,14 @@ const IgnoredRows = S.TaggedStruct('IgnoredRows', {
  * - `UnreadCells`: cells their column cannot read, read as empty.
  * - `IgnoredRows`: rows with no place in `PsaData`, such as positions before
  *   any fixture in their planogram, ignored.
+ * - `GeneratedIds`: planograms without a key, given a generated id when read as
+ *   a project, which writing puts in their key.
  */
 export const PsaMessage = S.Union([
   UnlistedWidth,
   DroppedCells,
   UnreadCells,
   IgnoredRows,
+  GeneratedIds,
 ]).annotate({ identifier: 'PsaMessage' });
 export type PsaMessage = typeof PsaMessage.Type;

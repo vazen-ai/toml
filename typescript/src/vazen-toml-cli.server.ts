@@ -478,6 +478,9 @@ const sentence = (message: PsaMessage): string => {
     case 'DroppedCells': {
       return `${rows} have cells past their last column, which were dropped`;
     }
+    case 'GeneratedIds': {
+      return `${rows} have no key, so were given generated ids, which writing as PSA puts in their key`;
+    }
     case 'IgnoredRows': {
       return `${rows} have no place in the project, so were ignored`;
     }
